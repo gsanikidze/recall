@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"recall/cmd"
 )
 
 const version = "0.1.0"
@@ -20,7 +22,10 @@ func main() {
 	case "help", "-h", "--help":
 		printHelp()
 	case "init":
-		runInit()
+		if err := cmd.Init(); err != nil {
+			fmt.Fprintf(os.Stderr, "recall init: %v\n", err)
+			os.Exit(1)
+		}
 	case "version", "-v", "--version":
 		fmt.Printf("recall %s\n", version)
 	default:
@@ -43,8 +48,4 @@ Commands:
 
 Run with no command to open the interactive TUI.
 `)
-}
-
-func runInit() {
-	fmt.Println("recall init: initializing workspace... (not implemented yet)")
 }
