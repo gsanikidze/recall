@@ -1,0 +1,21 @@
+# Binaries
+/recall
+*.exe
+*.out
+
+# Test & coverage
+*.test
+*.prof
+coverage.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+.claude/
