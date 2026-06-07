@@ -1,0 +1,149 @@
+package mcpserver
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+
+	"recall/internal/recall"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// startTestServer wires a fresh engine to an MCP server over an in-memory
+// transport and returns a connected client session.
+func startTestServer(t *testing.T) *mcp.ClientSession {
+	t.Helper()
+	ctx := context.Background()
+
+	e, err := recall.Open(t.TempDir())
+	if err != nil {
+		t.Fatalf("recall.Open: %v", err)
+	}
+	if err := e.Vault().Scaffold(); err != nil {
+		t.Fatalf("Scaffold: %v", err)
+	}
+	t.Cleanup(func() { _ = e.Close() })
+
+	server := mcp.NewServer(&mcp.Implementation{Name: "recall", Version: "test"}, nil)
+	register(server, e)
+
+	serverT, clientT := mcp.NewInMemoryTransports()
+	if _, err := server.Connect(ctx, serverT, nil); err != nil {
+		t.Fatalf("server.Connect: %v", err)
+	}
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
+	session, err := client.Connect(ctx, clientT, nil)
+	if err != nil {
+		t.Fatalf("client.Connect: %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+	return session
+}
+
+// call invokes a tool and decodes its JSON text result into out.
+func call(t *testing.T, s *mcp.ClientSession, name string, args map[string]any, out any) {
+	t.Helper()
+	res, err := s.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
+	if err != nil {
+		t.Fatalf("CallTool %s: %v", name, err)
+	}
+	if res.IsError {
+		t.Fatalf("tool %s returned error: %+v", name, res.Content)
+	}
+	if out == nil {
+		return
+	}
+	text, ok := res.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatalf("tool %s: expected text content, got %T", name, res.Content[0])
+	}
+	if err := json.Unmarshal([]byte(text.Text), out); err != nil {
+		t.Fatalf("tool %s: decoding result %q: %v", name, text.Text, err)
+	}
+}
+
+func TestMCPToolsListed(t *testing.T) {
+	s := startTestServer(t)
+	res, err := s.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("ListTools: %v", err)
+	}
+	want := map[string]bool{
+		"recall_search": false, "recall_get": false, "recall_add": false,
+		"recall_update": false, "recall_list_domains": false, "recall_reindex": false,
+	}
+	for _, tool := range res.Tools {
+		if _, ok := want[tool.Name]; ok {
+			want[tool.Name] = true
+		}
+	}
+	for name, found := range want {
+		if !found {
+			t.Errorf("tool %q not registered", name)
+		}
+	}
+}
+
+func TestMCPAddSearchGetFlow(t *testing.T) {
+	s := startTestServer(t)
+
+	// list domains
+	var domains domainsOut
+	call(t, s, "recall_list_domains", map[string]any{}, &domains)
+	if len(domains.Domains) == 0 {
+		t.Fatal("no domains listed")
+	}
+
+	// add
+	var added addOut
+	call(t, s, "recall_add", map[string]any{
+		"title":  "Kamal deploy",
+		"body":   "Deploys run through **Kamal**.",
+		"domain": "tools",
+		"tags":   []string{"deploy"},
+	}, &added)
+	if added.ID == "" || added.Path == "" {
+		t.Fatalf("add returned empty: %+v", added)
+	}
+
+	// search
+	var search searchOut
+	call(t, s, "recall_search", map[string]any{"query": "kamal"}, &search)
+	if len(search.Hits) != 1 || search.Hits[0].ID != added.ID {
+		t.Fatalf("search = %+v", search)
+	}
+
+	// get
+	var got getOut
+	call(t, s, "recall_get", map[string]any{"id": added.ID}, &got)
+	if got.Title != "Kamal deploy" || got.Domain != "tools" {
+		t.Fatalf("get = %+v", got)
+	}
+	// Full Markdown body is returned to the agent, formatting intact.
+	if got.Body == "" {
+		t.Error("get returned empty body")
+	}
+
+	// update
+	call(t, s, "recall_update", map[string]any{"id": added.ID, "body": "Now uses Kamal v2 and widgets."}, nil)
+	var search2 searchOut
+	call(t, s, "recall_search", map[string]any{"query": "widgets"}, &search2)
+	if len(search2.Hits) != 1 {
+		t.Fatalf("search after update = %+v", search2)
+	}
+}
+
+func TestMCPAddRejectsUnknownDomain(t *testing.T) {
+	s := startTestServer(t)
+	res, err := s.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "recall_add",
+		Arguments: map[string]any{"title": "x", "body": "y", "domain": "nonexistent"},
+	})
+	if err != nil {
+		t.Fatalf("CallTool transport error: %v", err)
+	}
+	if !res.IsError {
+		t.Error("expected tool error for unknown domain")
+	}
+}

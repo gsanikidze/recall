@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"recall/internal/vault"
 )
 
 // Init initializes the recall workspace: it asks where the project should be
@@ -54,9 +56,8 @@ func Init() error {
 
 	if err := createDataDirectoryScaffold(path); err != nil {
 		return err
-	} else {
-		fmt.Println("created project directory scaffold.")
 	}
+	fmt.Println("created project directory scaffold.")
 
 	cfgPath, _ := configPath()
 	fmt.Printf("initialized recall.\nproject stored at: %s\nconfig: %s\n", path, cfgPath)
@@ -98,12 +99,15 @@ func resolvePath(p string) (string, error) {
 	return abs, nil
 }
 
+// createDataDirectoryScaffold lays out the project: the db/ folder for the
+// SQLite index and a fully scaffolded vault/ (predefined domain folders, each
+// with a README describing what belongs there, plus the top-level index).
 func createDataDirectoryScaffold(path string) error {
-	subdirs := []string{"vault", "db"}
-	for _, subdir := range subdirs {
-		if err := os.MkdirAll(filepath.Join(path, subdir), 0o755); err != nil {
-			return fmt.Errorf("creating directory %s: %w", subdir, err)
-		}
+	if err := os.MkdirAll(filepath.Join(path, "db"), 0o755); err != nil {
+		return fmt.Errorf("creating directory db: %w", err)
+	}
+	if err := vault.Open(filepath.Join(path, "vault")).Scaffold(); err != nil {
+		return err
 	}
 	return nil
 }
