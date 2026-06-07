@@ -112,6 +112,18 @@ func (e *Engine) Get(ctx context.Context, id string) (memory.Memory, string, err
 	return m, relPath, nil
 }
 
+// Delete removes a memory from both the vault and the index.
+func (e *Engine) Delete(ctx context.Context, id string) error {
+	_, relPath, err := e.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := e.vault.Delete(relPath); err != nil {
+		return err
+	}
+	return e.index.Delete(ctx, id)
+}
+
 // Search runs a filtered, ranked query against the index.
 func (e *Engine) Search(ctx context.Context, f index.Filter) ([]index.Hit, error) {
 	return e.index.Search(ctx, f)

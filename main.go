@@ -37,6 +37,8 @@ func main() {
 		err = cmd.Reindex(rest)
 	case "mcp":
 		err = cmd.MCP(rest, version)
+	case "ui":
+		err = cmd.UI(rest)
 	case "version", "-v", "--version":
 		fmt.Printf("recall %s\n", version)
 	default:
@@ -64,6 +66,7 @@ Commands:
   domain      Manage domains: domain list | domain add <name> --desc "..."
   reindex     Rebuild the SQLite index from the vault
   mcp         Run the MCP server (stdio) for LLM agents
+  ui          Start the web UI at localhost:8888 (--port N --no-browser)
   help        Show this help
   version     Print version
 
