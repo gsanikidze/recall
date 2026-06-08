@@ -104,7 +104,12 @@ func (v *Vault) ensureDomain(d Domain) error {
 
 // HasDomain reports whether a domain folder exists. It is a cheap existence
 // check (a single stat), unlike ListDomains which reads every domain README.
+// Names that don't satisfy domainNamePattern are always rejected, preventing
+// path traversal via crafted domain values.
 func (v *Vault) HasDomain(name string) bool {
+	if !domainNamePattern.MatchString(name) {
+		return false
+	}
 	info, err := os.Stat(v.DomainPath(name))
 	return err == nil && info.IsDir()
 }

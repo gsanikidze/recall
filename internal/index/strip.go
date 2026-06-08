@@ -14,7 +14,7 @@ var (
 	reHeading   = regexp.MustCompile(`(?m)^#{1,6}\s+`)
 	reQuote     = regexp.MustCompile(`(?m)^>\s?`)
 	reListItem  = regexp.MustCompile(`(?m)^[\s]*[-*+]\s+`)
-	reEmphasis  = regexp.MustCompile(`[*_~]{1,3}`)
+	reEmphasis  = regexp.MustCompile(`[*~]{1,3}`)
 	reWhitespace = regexp.MustCompile(`[ \t]+`)
 	reBlankLines = regexp.MustCompile(`\n{3,}`)
 )

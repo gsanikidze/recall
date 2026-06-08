@@ -107,6 +107,9 @@ func (e *Engine) Get(ctx context.Context, id string) (memory.Memory, string, err
 	}
 	m, err := e.vault.Read(relPath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return memory.Memory{}, "", ErrNotFound
+		}
 		return memory.Memory{}, "", err
 	}
 	return m, relPath, nil
