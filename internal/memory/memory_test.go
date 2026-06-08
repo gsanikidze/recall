@@ -113,6 +113,8 @@ func TestValidate(t *testing.T) {
 		{"missing title", func(m *Memory) { m.Title = "" }, true},
 		{"missing domain", func(m *Memory) { m.Domain = "" }, true},
 		{"missing created", func(m *Memory) { m.Created = Date{} }, true},
+		{"missing updated", func(m *Memory) { m.Updated = Date{} }, true},
+		{"blank body", func(m *Memory) { m.Body = " \n	 " }, true},
 		{"bad lifecycle", func(m *Memory) { m.Lifecycle = "sometimes" }, true},
 		{"expires without date", func(m *Memory) { m.Lifecycle = Expires }, true},
 		{"evergreen with expiry", func(m *Memory) { m.ExpiresOn = mustDate(t, "2026-12-31") }, true},

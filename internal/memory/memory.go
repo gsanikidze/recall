@@ -181,6 +181,12 @@ func (m Memory) Validate() error {
 	if m.Created.IsZero() {
 		return fmt.Errorf("memory: created date is required")
 	}
+	if m.Updated.IsZero() {
+		return fmt.Errorf("memory: updated date is required")
+	}
+	if strings.TrimSpace(m.Body) == "" {
+		return fmt.Errorf("memory: body is required")
+	}
 	switch m.Lifecycle {
 	case Evergreen:
 		if !m.ExpiresOn.IsZero() {
