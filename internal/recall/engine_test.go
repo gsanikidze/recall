@@ -2,12 +2,15 @@ package recall
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"recall/internal/index"
 	"recall/internal/memory"
+	"recall/internal/vault"
 )
 
 func newEngine(t *testing.T) *Engine {
@@ -23,6 +26,67 @@ func newEngine(t *testing.T) *Engine {
 	}
 	return e
 }
+
+func newEngineWithFakeIndex(t *testing.T) (*Engine, *fakeIndex) {
+	t.Helper()
+	v := vault.Open(t.TempDir())
+	if err := v.Scaffold(); err != nil {
+		t.Fatalf("Scaffold: %v", err)
+	}
+	fake := &fakeIndex{paths: map[string]string{}}
+	return &Engine{vault: v, index: fake}, fake
+}
+
+func sampleEngineMemory(t *testing.T) memory.Memory {
+	t.Helper()
+	d, err := memory.ParseDate("2026-06-07")
+	if err != nil {
+		t.Fatalf("ParseDate: %v", err)
+	}
+	return memory.Memory{
+		ID:        memory.NewID(),
+		Title:     "Original",
+		Domain:    "tools",
+		Created:   d,
+		Updated:   d,
+		Lifecycle: memory.Evergreen,
+		Body:      "original body",
+	}
+}
+
+type fakeIndex struct {
+	paths     map[string]string
+	upsertErr error
+	deleteErr error
+}
+
+func (f *fakeIndex) Upsert(_ context.Context, relPath string, m memory.Memory) error {
+	if f.upsertErr != nil {
+		return f.upsertErr
+	}
+	f.paths[m.ID] = relPath
+	return nil
+}
+
+func (f *fakeIndex) Delete(_ context.Context, id string) error {
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	delete(f.paths, id)
+	return nil
+}
+
+func (f *fakeIndex) Path(_ context.Context, id string) (string, error) {
+	relPath, ok := f.paths[id]
+	if !ok {
+		return "", sql.ErrNoRows
+	}
+	return relPath, nil
+}
+
+func (f *fakeIndex) Search(context.Context, index.Filter) ([]index.Hit, error) { return nil, nil }
+func (f *fakeIndex) ListIDs(context.Context) ([]string, error)                 { return nil, nil }
+func (f *fakeIndex) Close() error                                              { return nil }
 
 func TestAddGetSearch(t *testing.T) {
 	e := newEngine(t)
@@ -101,6 +165,68 @@ func TestUpdate(t *testing.T) {
 	hits, _ := e.Search(ctx, index.Filter{Query: "widgets"})
 	if len(hits) != 1 {
 		t.Errorf("search after update = %+v", hits)
+	}
+}
+
+func TestAddIndexFailureRemovesVaultFile(t *testing.T) {
+	e, fake := newEngineWithFakeIndex(t)
+	fake.upsertErr = errors.New("boom")
+
+	_, _, err := e.Add(context.Background(), AddParams{Title: "Draft", Body: "body", Domain: "inbox"})
+	if err == nil {
+		t.Fatal("expected Add error")
+	}
+	paths, scanErr := e.Vault().Scan()
+	if scanErr != nil {
+		t.Fatalf("Scan: %v", scanErr)
+	}
+	if len(paths) != 0 {
+		t.Fatalf("vault file left behind after index failure: %v", paths)
+	}
+}
+
+func TestUpdateIndexFailureRestoresOldFile(t *testing.T) {
+	e, fake := newEngineWithFakeIndex(t)
+	original := sampleEngineMemory(t)
+	relPath, err := e.Vault().Write(original)
+	if err != nil {
+		t.Fatalf("Write original: %v", err)
+	}
+	fake.paths[original.ID] = relPath
+	fake.upsertErr = errors.New("boom")
+
+	newBody := "new body"
+	if _, _, err := e.Update(context.Background(), original.ID, UpdateParams{Body: &newBody}); err == nil {
+		t.Fatal("expected Update error")
+	}
+	got, err := e.Vault().Read(relPath)
+	if err != nil {
+		t.Fatalf("Read restored memory: %v", err)
+	}
+	if got.Body != original.Body+"\n" && got.Body != original.Body {
+		t.Fatalf("body not restored: got %q want %q", got.Body, original.Body)
+	}
+}
+
+func TestDeleteIndexFailureRestoresVaultFile(t *testing.T) {
+	e, fake := newEngineWithFakeIndex(t)
+	original := sampleEngineMemory(t)
+	relPath, err := e.Vault().Write(original)
+	if err != nil {
+		t.Fatalf("Write original: %v", err)
+	}
+	fake.paths[original.ID] = relPath
+	fake.deleteErr = errors.New("boom")
+
+	if err := e.Delete(context.Background(), original.ID); err == nil {
+		t.Fatal("expected Delete error")
+	}
+	got, err := e.Vault().Read(relPath)
+	if err != nil {
+		t.Fatalf("Read restored memory: %v", err)
+	}
+	if got.ID != original.ID {
+		t.Fatalf("restored memory id = %q, want %q", got.ID, original.ID)
 	}
 }
 

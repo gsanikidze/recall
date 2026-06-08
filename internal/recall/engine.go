@@ -1,7 +1,9 @@
 // Package recall is the orchestration engine that ties the vault (source of
 // truth) to the SQLite index (search cache). Every write goes through here:
-// it writes the Markdown file first, then updates the index, so the two never
-// drift on writes recall itself makes. Both the CLI and the MCP server call
+// it writes the Markdown file first, then updates the index; if the index step
+// fails, the engine compensates by deleting the new file or restoring the old
+// file so the rebuildable index never points at missing or half-written vault
+// content from writes recall itself makes. Both the CLI and the MCP server call
 // into this one engine.
 package recall
 
@@ -24,7 +26,16 @@ var ErrNotFound = errors.New("recall: memory not found")
 // Engine couples a vault with its index.
 type Engine struct {
 	vault *vault.Vault
-	index *index.Index
+	index indexStore
+}
+
+type indexStore interface {
+	Upsert(context.Context, string, memory.Memory) error
+	Delete(context.Context, string) error
+	Path(context.Context, string) (string, error)
+	Search(context.Context, index.Filter) ([]index.Hit, error)
+	ListIDs(context.Context) ([]string, error)
+	Close() error
 }
 
 // Open opens the engine for a recall project directory, which must contain a
@@ -91,6 +102,9 @@ func (e *Engine) Add(ctx context.Context, p AddParams) (memory.Memory, string, e
 		return memory.Memory{}, "", err
 	}
 	if err := e.index.Upsert(ctx, relPath, m); err != nil {
+		if cleanupErr := e.vault.Delete(relPath); cleanupErr != nil {
+			return memory.Memory{}, "", fmt.Errorf("recall: indexing new memory failed: %w; cleanup failed: %v", err, cleanupErr)
+		}
 		return memory.Memory{}, "", err
 	}
 	return m, relPath, nil
@@ -117,17 +131,20 @@ func (e *Engine) Get(ctx context.Context, id string) (memory.Memory, string, err
 
 // Delete removes a memory from both the vault and the index.
 func (e *Engine) Delete(ctx context.Context, id string) error {
-	relPath, err := e.index.Path(ctx, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	}
+	m, relPath, err := e.Get(ctx, id)
 	if err != nil {
 		return err
 	}
 	if err := e.vault.Delete(relPath); err != nil {
 		return err
 	}
-	return e.index.Delete(ctx, id)
+	if err := e.index.Delete(ctx, id); err != nil {
+		if restoreErr := e.vault.WriteAt(relPath, m); restoreErr != nil {
+			return fmt.Errorf("recall: deleting index entry failed: %w; restore failed: %v", err, restoreErr)
+		}
+		return err
+	}
+	return nil
 }
 
 // Search runs a filtered, ranked query against the index.
@@ -165,6 +182,7 @@ func (e *Engine) Update(ctx context.Context, id string, p UpdateParams) (memory.
 	if err != nil {
 		return memory.Memory{}, "", err
 	}
+	original := m
 
 	if p.Title != nil {
 		m.Title = *p.Title
@@ -207,6 +225,9 @@ func (e *Engine) Update(ctx context.Context, id string, p UpdateParams) (memory.
 		return memory.Memory{}, "", err
 	}
 	if err := e.index.Upsert(ctx, relPath, m); err != nil {
+		if restoreErr := e.vault.WriteAt(relPath, original); restoreErr != nil {
+			return memory.Memory{}, "", fmt.Errorf("recall: indexing updated memory failed: %w; restore failed: %v", err, restoreErr)
+		}
 		return memory.Memory{}, "", err
 	}
 	return m, relPath, nil
