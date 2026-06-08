@@ -110,7 +110,7 @@ func (v *Vault) HasDomain(name string) bool {
 	if !domainNamePattern.MatchString(name) {
 		return false
 	}
-	info, err := os.Stat(v.DomainPath(name))
+	info, err := os.Lstat(v.DomainPath(name))
 	return err == nil && info.IsDir()
 }
 

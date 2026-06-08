@@ -25,6 +25,9 @@ func (v *Vault) Write(m memory.Memory) (string, error) {
 	if err := m.Validate(); err != nil {
 		return "", err
 	}
+	if _, err := v.safePath(m.Domain); err != nil {
+		return "", err
+	}
 	dir := v.DomainPath(m.Domain)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("vault: creating domain %q: %w", m.Domain, err)
@@ -182,9 +185,57 @@ func (v *Vault) safePath(relPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf("vault: resolving root: %w", err)
+	}
 	abs := filepath.Join(root, clean)
 	if abs != root && !strings.HasPrefix(abs, root+string(filepath.Separator)) {
 		return "", fmt.Errorf("vault: unsafe path %q", relPath)
 	}
+	if err := ensureInsideResolvedRoot(resolvedRoot, abs); err != nil {
+		return "", fmt.Errorf("vault: unsafe path %q", relPath)
+	}
 	return abs, nil
+}
+
+func ensureInsideResolvedRoot(resolvedRoot, abs string) error {
+	target, err := resolvedExistingPath(abs)
+	if err != nil {
+		return err
+	}
+	rel, err := filepath.Rel(resolvedRoot, target)
+	if err != nil {
+		return err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("path escapes vault root")
+	}
+	return nil
+}
+
+func resolvedExistingPath(abs string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err == nil {
+		return resolved, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return "", err
+	}
+
+	path := abs
+	for {
+		parent := filepath.Dir(path)
+		if parent == path {
+			return "", err
+		}
+		path = parent
+		resolved, evalErr := filepath.EvalSymlinks(path)
+		if evalErr == nil {
+			return resolved, nil
+		}
+		if !errors.Is(evalErr, fs.ErrNotExist) {
+			return "", evalErr
+		}
+	}
 }

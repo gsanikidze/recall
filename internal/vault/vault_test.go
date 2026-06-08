@@ -228,3 +228,54 @@ func TestRejectsUnsafeRelativePaths(t *testing.T) {
 		}
 	}
 }
+
+func TestRejectsSymlinkDomain(t *testing.T) {
+	v := newVault(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(v.Root(), "escape")); err != nil {
+		t.Fatalf("Symlink: %v", err)
+	}
+
+	if v.HasDomain("escape") {
+		t.Fatal("HasDomain accepted symlinked domain")
+	}
+
+	m := sampleMemory(t)
+	m.Domain = "escape"
+	if _, err := v.Write(m); err == nil {
+		t.Fatal("Write accepted symlinked domain")
+	}
+}
+
+func TestRejectsSymlinkEscapes(t *testing.T) {
+	v := newVault(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(v.Root(), "links")); err != nil {
+		t.Fatalf("Symlink: %v", err)
+	}
+
+	m := sampleMemory(t)
+	rel := filepath.Join("links", "escape.md")
+	if err := v.WriteAt(rel, m); err == nil {
+		t.Fatal("WriteAt accepted symlink escape path")
+	}
+
+	data, err := m.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	outsideFile := filepath.Join(outside, "escape.md")
+	if err := os.WriteFile(outsideFile, data, 0o644); err != nil {
+		t.Fatalf("write outside memory: %v", err)
+	}
+
+	if _, err := v.Read(rel); err == nil {
+		t.Fatal("Read accepted symlink escape path")
+	}
+	if err := v.Delete(rel); err == nil {
+		t.Fatal("Delete accepted symlink escape path")
+	}
+	if _, err := os.Stat(outsideFile); err != nil {
+		t.Fatalf("Delete touched escaped file: %v", err)
+	}
+}
