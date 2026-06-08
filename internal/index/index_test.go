@@ -75,6 +75,33 @@ func TestSearchSanitizesFTSOperators(t *testing.T) {
 	}
 }
 
+func TestSearchLimitDefaultsAndClamps(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+	for i := 0; i < MaxLimit+5; i++ {
+		m := mem(t, "01LIM"+string(rune('A'+i/26))+string(rune('A'+i%26)), "Limit memory", "tools", "same body")
+		if err := ix.Upsert(ctx, m.ID+".md", m); err != nil {
+			t.Fatalf("Upsert %d: %v", i, err)
+		}
+	}
+
+	hits, err := ix.Search(ctx, Filter{Limit: 0})
+	if err != nil {
+		t.Fatalf("Search default: %v", err)
+	}
+	if len(hits) != defaultLimit {
+		t.Fatalf("default limit returned %d hits, want %d", len(hits), defaultLimit)
+	}
+
+	hits, err = ix.Search(ctx, Filter{Limit: MaxLimit + 1000})
+	if err != nil {
+		t.Fatalf("Search clamped: %v", err)
+	}
+	if len(hits) != MaxLimit {
+		t.Fatalf("clamped limit returned %d hits, want %d", len(hits), MaxLimit)
+	}
+}
+
 func TestSearchFilters(t *testing.T) {
 	ix := openIndex(t)
 	ctx := context.Background()

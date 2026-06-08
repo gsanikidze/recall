@@ -10,6 +10,9 @@ import (
 // defaultLimit caps result count when a caller does not specify one.
 const defaultLimit = 20
 
+// MaxLimit is the hard upper bound for one search call.
+const MaxLimit = 200
+
 // recencyPenalty sinks stale memories: each day since a memory was updated adds
 // this much to its (lower-is-better) score, so old items drift down without
 // being removed. The agent still decides final relevance.
@@ -46,6 +49,9 @@ func (ix *Index) Search(ctx context.Context, f Filter) ([]Hit, error) {
 	limit := f.Limit
 	if limit <= 0 {
 		limit = defaultLimit
+	}
+	if limit > MaxLimit {
+		limit = MaxLimit
 	}
 
 	var (
