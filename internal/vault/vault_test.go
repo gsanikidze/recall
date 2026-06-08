@@ -120,6 +120,35 @@ func TestWriteReadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestReadRejectsInvalidMemoryWithPathContext(t *testing.T) {
+	v := newVault(t)
+	rel := filepath.Join("tools", "2026-06-07-invalid.md")
+	data := `---
+id: 01J8X3QH000000000000000000
+title: Invalid memory
+domain: tools
+created: "2026-06-07"
+lifecycle: evergreen
+---
+
+body without updated date
+`
+	if err := os.WriteFile(filepath.Join(v.Root(), rel), []byte(data), 0o644); err != nil {
+		t.Fatalf("write invalid memory: %v", err)
+	}
+
+	_, err := v.Read(rel)
+	if err == nil {
+		t.Fatal("expected invalid memory error")
+	}
+	if !strings.Contains(err.Error(), rel) {
+		t.Fatalf("error missing path %q: %v", rel, err)
+	}
+	if !strings.Contains(err.Error(), "updated date is required") {
+		t.Fatalf("error missing validation cause: %v", err)
+	}
+}
+
 func TestWriteCollisionAppendsSuffix(t *testing.T) {
 	v := newVault(t)
 	m1 := sampleMemory(t)

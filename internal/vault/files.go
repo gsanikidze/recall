@@ -78,6 +78,9 @@ func (v *Vault) Read(relPath string) (memory.Memory, error) {
 	if err != nil {
 		return memory.Memory{}, fmt.Errorf("vault: parsing %q: %w", relPath, err)
 	}
+	if err := m.Validate(); err != nil {
+		return memory.Memory{}, fmt.Errorf("vault: invalid memory %q: %w", relPath, err)
+	}
 	return m, nil
 }
 
