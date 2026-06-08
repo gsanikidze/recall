@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import MDEditor from '@uiw/react-md-editor'
 import { Save, Trash2 } from 'lucide-react'
 import { MetadataPanel } from './MetadataPanel'
-import { updateMemory, deleteMemory } from '@/api/client'
+import { useUpdateMemory, useDeleteMemory } from '@/queries'
 import type { MemoryDetail } from '@/api/types'
 
 interface Props {
@@ -13,48 +13,57 @@ interface Props {
 
 export function MemoryEditor({ memory, onSaved, onDeleted }: Props) {
   const [draft, setDraft] = useState<MemoryDetail>(memory)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Reset draft when the selected memory changes.
+  const updateMutation = useUpdateMemory()
+  const deleteMutation = useDeleteMemory()
+
   useEffect(() => { setDraft(memory); setError(null) }, [memory.id])
 
-  const handleSave = async () => {
-    setSaving(true)
+  const handleSave = () => {
     setError(null)
-    try {
-      const updated = await updateMemory(memory.id, {
-        title: draft.title,
-        body: draft.body,
-        tags: draft.tags,
-        project: draft.project,
-        lifecycle: draft.lifecycle,
-        expires_on: draft.expires_on,
-        source: draft.source,
-        links: draft.links,
-      })
-      onSaved(updated)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setSaving(false)
-    }
+    updateMutation.mutate(
+      {
+        id: memory.id,
+        params: {
+          title: draft.title,
+          body: draft.body,
+          tags: draft.tags,
+          project: draft.project,
+          lifecycle: draft.lifecycle,
+          expires_on: draft.expires_on,
+          source: draft.source,
+          links: draft.links,
+        },
+      },
+      {
+        onSuccess: onSaved,
+        onError: (e) => setError(e instanceof Error ? e.message : String(e)),
+      },
+    )
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!confirm(`Delete "${memory.title}"?`)) return
-    setDeleting(true)
-    try {
-      await deleteMemory(memory.id)
-      onDeleted()
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
-      setDeleting(false)
-    }
+    setError(null)
+    deleteMutation.mutate(memory.id, {
+      onSuccess: onDeleted,
+      onError: (e) => setError(e instanceof Error ? e.message : String(e)),
+    })
   }
 
-  const isDirty = JSON.stringify(draft) !== JSON.stringify(memory)
+  const isDirty =
+    draft.title !== memory.title ||
+    draft.body !== memory.body ||
+    draft.project !== memory.project ||
+    draft.lifecycle !== memory.lifecycle ||
+    draft.expires_on !== memory.expires_on ||
+    draft.source !== memory.source ||
+    draft.tags.join('\0') !== memory.tags.join('\0') ||
+    draft.links.join('\0') !== memory.links.join('\0')
+
+  const saving = updateMutation.isPending
+  const deleting = deleteMutation.isPending
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

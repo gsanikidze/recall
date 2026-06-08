@@ -1,54 +1,43 @@
 import { useState, useCallback } from 'react'
 import { Routes, Route, useParams, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Layout } from '@/components/Layout'
 import { DomainSidebar } from '@/components/DomainSidebar'
 import { MemoryList } from '@/components/MemoryList'
 import { MemoryEditor } from '@/components/MemoryEditor'
 import { NewMemoryDialog } from '@/components/NewMemoryDialog'
-import { useDomains } from '@/hooks/useDomains'
-import { useMemories } from '@/hooks/useMemories'
-import { useMemory } from '@/hooks/useMemory'
-import { reindex } from '@/api/client'
+import { useDomains, useMemories, useMemory, useReindex, keys } from '@/queries'
+import { useDebounce } from '@/lib/useDebounce'
 import type { MemoryDetail } from '@/api/types'
 
 function AppShell() {
   const { domain, id } = useParams<{ domain?: string; id?: string }>()
   const navigate = useNavigate()
+  const qc = useQueryClient()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [showNew, setShowNew] = useState(false)
-  const [reindexing, setReindexing] = useState(false)
 
-  const { domains, reload: reloadDomains } = useDomains()
-  const { memories, reload: reloadList } = useMemories({
-    q: searchQuery,
-    domain,
-  })
-  const { memory: selectedMemory } = useMemory(id ?? null)
+  const debouncedQuery = useDebounce(searchQuery, 300)
 
-  const handleReindex = useCallback(async () => {
-    setReindexing(true)
-    try { await reindex() } finally {
-      setReindexing(false)
-      reloadList()
-    }
-  }, [reloadList])
+  const { data: domains = [] } = useDomains()
+  const { data: memories = [], isLoading } = useMemories({ q: debouncedQuery, domain })
+  const { data: selectedMemory } = useMemory(id ?? null)
+
+  const reindexMutation = useReindex()
 
   const handleSaved = useCallback((updated: MemoryDetail) => {
-    reloadList()
     navigate(domain ? `/domains/${domain}/${updated.id}` : `/${updated.id}`, { replace: true })
-  }, [reloadList, navigate, domain])
+  }, [navigate, domain])
 
   const handleDeleted = useCallback(() => {
-    reloadList()
     navigate(domain ? `/domains/${domain}` : '/')
-  }, [reloadList, navigate, domain])
+  }, [navigate, domain])
 
   const handleCreated = useCallback((newId: string) => {
     setShowNew(false)
-    reloadList()
     navigate(domain ? `/domains/${domain}/${newId}` : `/${newId}`)
-  }, [reloadList, navigate, domain])
+  }, [navigate, domain])
 
   return (
     <>
@@ -58,15 +47,15 @@ function AppShell() {
             domains={domains}
             selected={domain ?? null}
             onSelect={d => navigate(d ? `/domains/${d}` : '/')}
-            onReindex={handleReindex}
-            onAddDomain={() => reloadDomains()}
-            reindexing={reindexing}
+            onReindex={() => reindexMutation.mutate(undefined)}
+            onAddDomain={() => qc.invalidateQueries({ queryKey: keys.domains() })}
+            reindexing={reindexMutation.isPending}
           />
         }
         list={
           <MemoryList
             memories={memories}
-            loading={false}
+            loading={isLoading}
             selectedId={id ?? null}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}

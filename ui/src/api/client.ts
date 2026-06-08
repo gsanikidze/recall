@@ -16,12 +16,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export async function listDomains(): Promise<Domain[]> {
-  const data = await request<{ domains: Domain[] }>('/api/domains')
+export async function listDomains(signal?: AbortSignal): Promise<Domain[]> {
+  const data = await request<{ domains: Domain[] }>('/api/domains', { signal })
   return data.domains
 }
 
-export async function listMemories(filter: MemoryFilter = {}): Promise<MemoryHit[]> {
+export async function listMemories(filter: MemoryFilter = {}, signal?: AbortSignal): Promise<MemoryHit[]> {
   const params = new URLSearchParams()
   if (filter.q) params.set('q', filter.q)
   if (filter.domain) params.set('domain', filter.domain)
@@ -32,12 +32,12 @@ export async function listMemories(filter: MemoryFilter = {}): Promise<MemoryHit
   if (filter.until) params.set('until', filter.until)
   if (filter.include_expired) params.set('include_expired', 'true')
   if (filter.limit) params.set('limit', String(filter.limit))
-  const data = await request<{ memories: MemoryHit[] }>(`/api/memories?${params}`)
+  const data = await request<{ memories: MemoryHit[] }>(`/api/memories?${params}`, { signal })
   return data.memories ?? []
 }
 
-export async function getMemory(id: string): Promise<MemoryDetail> {
-  return request<MemoryDetail>(`/api/memories/${id}`)
+export async function getMemory(id: string, signal?: AbortSignal): Promise<MemoryDetail> {
+  return request<MemoryDetail>(`/api/memories/${id}`, { signal })
 }
 
 export async function createMemory(params: CreateMemoryParams): Promise<{ id: string; path: string }> {

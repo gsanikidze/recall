@@ -114,7 +114,10 @@ func (e *Engine) Get(ctx context.Context, id string) (memory.Memory, string, err
 
 // Delete removes a memory from both the vault and the index.
 func (e *Engine) Delete(ctx context.Context, id string) error {
-	_, relPath, err := e.Get(ctx, id)
+	relPath, err := e.index.Path(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
 	if err != nil {
 		return err
 	}

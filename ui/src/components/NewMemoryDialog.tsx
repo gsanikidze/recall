@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
-import { createMemory } from '@/api/client'
+import { useCreateMemory } from '@/queries'
 import type { Domain } from '@/api/types'
 
 interface Props {
@@ -13,23 +13,27 @@ export function NewMemoryDialog({ domains, onCreated, onClose }: Props) {
   const [title, setTitle] = useState('')
   const [domain, setDomain] = useState(domains[0]?.name ?? '')
   const [body, setBody] = useState('')
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleCreate = async () => {
+  const createMutation = useCreateMemory()
+
+  useEffect(() => {
+    if (domain === '' && domains.length > 0) setDomain(domains[0].name)
+  }, [domains, domain])
+
+  const handleCreate = () => {
     if (!title.trim() || !domain) {
       setError('Title and domain are required.')
       return
     }
-    setSaving(true)
     setError(null)
-    try {
-      const result = await createMemory({ title: title.trim(), body, domain })
-      onCreated(result.id)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
-      setSaving(false)
-    }
+    createMutation.mutate(
+      { title: title.trim(), body, domain },
+      {
+        onSuccess: (result) => onCreated(result.id),
+        onError: (e) => setError(e instanceof Error ? e.message : String(e)),
+      },
+    )
   }
 
   return (
@@ -91,10 +95,10 @@ export function NewMemoryDialog({ domains, onCreated, onClose }: Props) {
           </button>
           <button
             onClick={handleCreate}
-            disabled={saving}
+            disabled={createMutation.isPending}
             className="px-4 py-2 text-sm font-medium bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors disabled:opacity-40"
           >
-            {saving ? 'Creating…' : 'Create memory'}
+            {createMutation.isPending ? 'Creating…' : 'Create memory'}
           </button>
         </div>
       </div>
