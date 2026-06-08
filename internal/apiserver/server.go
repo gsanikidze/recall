@@ -18,7 +18,7 @@ import (
 // allowedOrigins is the strict CORS allowlist (Vite dev server only).
 // In production the UI is same-origin, so no Origin header is sent.
 var allowedOrigins = map[string]bool{
-	"http://localhost:5173":  true,
+	"http://localhost:5173": true,
 	"http://127.0.0.1:5173": true,
 }
 

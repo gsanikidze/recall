@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Go format check
+        run: make fmt-check
+
+      - name: Go mod tidy check
+        run: make tidy-check
+
+      - name: Go vet
+        run: make vet
+
+      - name: Go tests
+        run: make test
+
+      - name: Go race tests
+        run: make race
+
+      - name: Go coverage
+        run: make cover
+
+      - name: UI install
+        run: npm --prefix ui ci
+
+      - name: UI lint
+        run: make lint-ui
+
+      - name: UI build
+        run: make build-ui
+
+      - name: UI audit
+        run: make audit-ui
+
+      - name: Build without UI
+        run: make build-nui
+
+      - name: Build with UI
+        run: make build
+
+      - name: Test embedded UI tag
+        run: make test-ui-tag
