@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { Routes, Route, useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
 import { DomainSidebar } from '@/components/DomainSidebar'
 import { MemoryList } from '@/components/MemoryList'
@@ -10,9 +11,10 @@ import { useMemory } from '@/hooks/useMemory'
 import { reindex } from '@/api/client'
 import type { MemoryDetail } from '@/api/types'
 
-function App() {
-  const [selectedDomain, setSelectedDomain] = useState<string | null>(null)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+function AppShell() {
+  const { domain, id } = useParams<{ domain?: string; id?: string }>()
+  const navigate = useNavigate()
+
   const [searchQuery, setSearchQuery] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [reindexing, setReindexing] = useState(false)
@@ -20,9 +22,9 @@ function App() {
   const { domains, reload: reloadDomains } = useDomains()
   const { memories, reload: reloadList } = useMemories({
     q: searchQuery,
-    domain: selectedDomain ?? undefined,
+    domain,
   })
-  const { memory: selectedMemory } = useMemory(selectedId)
+  const { memory: selectedMemory } = useMemory(id ?? null)
 
   const handleReindex = useCallback(async () => {
     setReindexing(true)
@@ -33,22 +35,20 @@ function App() {
   }, [reloadList])
 
   const handleSaved = useCallback((updated: MemoryDetail) => {
-    // Update local detail cache by re-selecting the same id.
-    setSelectedId(null)
-    setTimeout(() => setSelectedId(updated.id), 0)
     reloadList()
-  }, [reloadList])
+    navigate(domain ? `/domains/${domain}/${updated.id}` : `/${updated.id}`, { replace: true })
+  }, [reloadList, navigate, domain])
 
   const handleDeleted = useCallback(() => {
-    setSelectedId(null)
     reloadList()
-  }, [reloadList])
+    navigate(domain ? `/domains/${domain}` : '/')
+  }, [reloadList, navigate, domain])
 
-  const handleCreated = useCallback((id: string) => {
+  const handleCreated = useCallback((newId: string) => {
     setShowNew(false)
     reloadList()
-    setSelectedId(id)
-  }, [reloadList])
+    navigate(domain ? `/domains/${domain}/${newId}` : `/${newId}`)
+  }, [reloadList, navigate, domain])
 
   return (
     <>
@@ -56,10 +56,10 @@ function App() {
         sidebar={
           <DomainSidebar
             domains={domains}
-            selected={selectedDomain}
-            onSelect={setSelectedDomain}
+            selected={domain ?? null}
+            onSelect={d => navigate(d ? `/domains/${d}` : '/')}
             onReindex={handleReindex}
-            onAddDomain={() => { /* TODO: add domain dialog */ reloadDomains() }}
+            onAddDomain={() => reloadDomains()}
             reindexing={reindexing}
           />
         }
@@ -67,10 +67,10 @@ function App() {
           <MemoryList
             memories={memories}
             loading={false}
-            selectedId={selectedId}
+            selectedId={id ?? null}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onSelect={setSelectedId}
+            onSelect={memId => navigate(domain ? `/domains/${domain}/${memId}` : `/${memId}`)}
             onNew={() => setShowNew(true)}
           />
         }
@@ -101,4 +101,13 @@ function App() {
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<AppShell />} />
+      <Route path="/:id" element={<AppShell />} />
+      <Route path="/domains/:domain" element={<AppShell />} />
+      <Route path="/domains/:domain/:id" element={<AppShell />} />
+    </Routes>
+  )
+}
