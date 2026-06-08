@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"recall/internal/index"
 )
 
 type doctorReport struct {
@@ -66,11 +64,11 @@ func Doctor(args []string) error {
 		} else {
 			report.Domains = len(domains)
 		}
-		if hits, err := e.Search(context.Background(), index.Filter{Limit: 1, IncludeExpired: true}); err != nil {
+		if count, err := e.MemoryCount(context.Background()); err != nil {
 			report.OK = false
 			report.Errors = append(report.Errors, err.Error())
 		} else {
-			report.Memories = len(hits)
+			report.Memories = count
 		}
 		if _, err := os.Stat(report.DBPath); err != nil {
 			report.OK = false

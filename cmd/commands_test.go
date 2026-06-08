@@ -110,6 +110,18 @@ func TestAddSearchGetDeleteJSONFlow(t *testing.T) {
 		t.Fatalf("get json output = %s", out)
 	}
 
+	if err := Add([]string{"--title", "Second Memory", "--domain", "tools", "--body", "Another memory"}); err != nil {
+		t.Fatalf("Add second memory: %v", err)
+	}
+	out = captureStdout(t, func() {
+		if err := Doctor([]string{"--json"}); err != nil {
+			t.Fatalf("Doctor after multiple memories: %v", err)
+		}
+	})
+	if !strings.Contains(out, `"memories": 2`) {
+		t.Fatalf("doctor should count all memories, got %s", out)
+	}
+
 	out = captureStdout(t, func() {
 		if err := Delete([]string{id, "--yes"}); err != nil {
 			t.Fatalf("Delete: %v", err)

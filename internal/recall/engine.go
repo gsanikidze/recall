@@ -71,16 +71,16 @@ func (e *Engine) Add(ctx context.Context, p AddParams) (memory.Memory, string, e
 
 	today := memory.Today()
 	m := memory.Memory{
-		ID:        memory.NewID(),
-		Title:     p.Title,
-		Domain:    p.Domain,
-		Tags:      p.Tags,
-		Project:   p.Project,
-		Created:   today,
-		Updated:   today,
-		Source:    p.Source,
-		Links:     p.Links,
-		Body:      p.Body,
+		ID:      memory.NewID(),
+		Title:   p.Title,
+		Domain:  p.Domain,
+		Tags:    p.Tags,
+		Project: p.Project,
+		Created: today,
+		Updated: today,
+		Source:  p.Source,
+		Links:   p.Links,
+		Body:    p.Body,
 	}
 	if err := applyLifecycle(&m, p.Lifecycle, p.ExpiresOn); err != nil {
 		return memory.Memory{}, "", err
@@ -133,6 +133,15 @@ func (e *Engine) Delete(ctx context.Context, id string) error {
 // Search runs a filtered, ranked query against the index.
 func (e *Engine) Search(ctx context.Context, f index.Filter) ([]index.Hit, error) {
 	return e.index.Search(ctx, f)
+}
+
+// MemoryCount returns the number of indexed memories.
+func (e *Engine) MemoryCount(ctx context.Context) (int, error) {
+	ids, err := e.index.ListIDs(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return len(ids), nil
 }
 
 // UpdateParams holds optional edits; only non-nil fields are applied. The
