@@ -1,8 +1,9 @@
--- schema.sql defines the relational tables for sqlc code generation only.
+-- schema.sql defines the tables for sqlc code generation only.
 -- The authoritative, runtime schema lives in migrations/ (applied by goose) and
--- additionally creates the memories_fts FTS5 virtual table, which sqlc does not
--- need to know about (full-text search is hand-written in search.go). Keep the
--- table/column definitions here in sync with migrations/0001_init.sql.
+-- creates memories_fts as an FTS5 virtual table. For sqlc, memories_fts is
+-- declared as a normal table with matching writable columns so static FTS
+-- maintenance queries can be generated. Dynamic FTS search remains hand-written
+-- in search.go. Keep table/column definitions here in sync with migrations/0001_init.sql.
 
 CREATE TABLE memories (
     id          TEXT PRIMARY KEY,
@@ -26,4 +27,10 @@ CREATE TABLE tags (
 CREATE TABLE links (
     memory_id TEXT NOT NULL,
     target_id TEXT NOT NULL
+);
+
+CREATE TABLE memories_fts (
+    id    TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body  TEXT NOT NULL
 );

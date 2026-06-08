@@ -51,7 +51,10 @@ func (v *Vault) WriteAt(relPath string, m memory.Memory) error {
 	if err != nil {
 		return err
 	}
-	abs := filepath.Join(v.root, relPath)
+	abs, err := v.safePath(relPath)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 		return fmt.Errorf("vault: creating dir for %q: %w", relPath, err)
 	}
@@ -63,7 +66,11 @@ func (v *Vault) WriteAt(relPath string, m memory.Memory) error {
 
 // Read parses the memory file at a vault-relative path.
 func (v *Vault) Read(relPath string) (memory.Memory, error) {
-	data, err := os.ReadFile(filepath.Join(v.root, relPath))
+	abs, err := v.safePath(relPath)
+	if err != nil {
+		return memory.Memory{}, err
+	}
+	data, err := os.ReadFile(abs)
 	if err != nil {
 		return memory.Memory{}, fmt.Errorf("vault: reading %q: %w", relPath, err)
 	}
@@ -76,7 +83,11 @@ func (v *Vault) Read(relPath string) (memory.Memory, error) {
 
 // Delete removes the memory file at a vault-relative path.
 func (v *Vault) Delete(relPath string) error {
-	if err := os.Remove(filepath.Join(v.root, relPath)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	abs, err := v.safePath(relPath)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(abs); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("vault: deleting %q: %w", relPath, err)
 	}
 	return nil
@@ -154,4 +165,23 @@ func appendIDSuffix(name, id string) string {
 	}
 	base := strings.TrimSuffix(name, ".md")
 	return base + "-" + short + ".md"
+}
+
+func (v *Vault) safePath(relPath string) (string, error) {
+	if relPath == "" || filepath.IsAbs(relPath) {
+		return "", fmt.Errorf("vault: unsafe path %q", relPath)
+	}
+	clean := filepath.Clean(relPath)
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("vault: unsafe path %q", relPath)
+	}
+	root, err := filepath.Abs(v.root)
+	if err != nil {
+		return "", err
+	}
+	abs := filepath.Join(root, clean)
+	if abs != root && !strings.HasPrefix(abs, root+string(filepath.Separator)) {
+		return "", fmt.Errorf("vault: unsafe path %q", relPath)
+	}
+	return abs, nil
 }

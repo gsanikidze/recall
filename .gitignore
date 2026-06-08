@@ -1,5 +1,6 @@
 # Binaries
 /recall
+/bin
 *.exe
 *.out
 

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,12 +17,19 @@ import (
 //
 // The stored path is permanent: if a config already exists, Init reports it and
 // makes no changes rather than overriding it.
-func Init() error {
+func Init(args []string) error {
+	fs := flag.NewFlagSet("init", flag.ContinueOnError)
+	pathFlag := fs.String("path", "", "project directory")
+	force := fs.Bool("force", false, "overwrite existing config without prompting")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
 	cfg, found, err := loadConfig()
 	if err != nil {
 		return err
 	}
-	if found && cfg.ProjectPath != "" {
+	if found && cfg.ProjectPath != "" && !*force {
 		fmt.Printf("recall already initialized.\nproject stored at: %s\n", cfg.ProjectPath)
 
 		overwrite, err := promptYN("re-initialize and overwrite existing config?")
@@ -40,7 +48,12 @@ func Init() error {
 		return err
 	}
 
-	path, err := promptPath(def)
+	var path string
+	if *pathFlag != "" {
+		path, err = resolvePath(*pathFlag)
+	} else {
+		path, err = promptPath(def)
+	}
 	if err != nil {
 		return err
 	}

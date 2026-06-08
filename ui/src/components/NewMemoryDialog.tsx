@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useCreateMemory } from '@/queries'
 import type { Domain } from '@/api/types'
@@ -16,19 +16,16 @@ export function NewMemoryDialog({ domains, onCreated, onClose }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   const createMutation = useCreateMemory()
-
-  useEffect(() => {
-    if (domain === '' && domains.length > 0) setDomain(domains[0].name)
-  }, [domains, domain])
+  const selectedDomain = domain || domains[0]?.name || ''
 
   const handleCreate = () => {
-    if (!title.trim() || !domain) {
+    if (!title.trim() || !selectedDomain) {
       setError('Title and domain are required.')
       return
     }
     setError(null)
     createMutation.mutate(
-      { title: title.trim(), body, domain },
+      { title: title.trim(), body, domain: selectedDomain },
       {
         onSuccess: (result) => onCreated(result.id),
         onError: (e) => setError(e instanceof Error ? e.message : String(e)),
@@ -63,7 +60,7 @@ export function NewMemoryDialog({ domains, onCreated, onClose }: Props) {
           <div>
             <label className="text-xs text-white/40 block mb-1">Domain *</label>
             <select
-              value={domain}
+              value={selectedDomain}
               onChange={e => setDomain(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 focus:outline-none focus:border-violet-500/50"
             >

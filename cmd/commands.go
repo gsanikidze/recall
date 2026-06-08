@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"recall/internal/index"
@@ -26,6 +27,7 @@ func Add(args []string) error {
 	expires := fs.String("expires", "", "expiry date YYYY-MM-DD (with --lifecycle expires)")
 	source := fs.String("source", "", "who/what produced this memory")
 	links := fs.String("links", "", "comma-separated related memory ids")
+	jsonOut := fs.Bool("json", false, "print JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -62,22 +64,20 @@ func Add(args []string) error {
 	if err != nil {
 		return err
 	}
+	if *jsonOut {
+		return printJSON(struct {
+			ID   string `json:"id"`
+			Path string `json:"path"`
+		}{ID: m.ID, Path: filepath.Join("vault", relPath)})
+	}
 	fmt.Printf("added %s\n%s\n", m.ID, filepath.Join("vault", relPath))
 	return nil
 }
 
 // Search runs a query and prints ranked hits.
 func Search(args []string) error {
-	fs := flag.NewFlagSet("search", flag.ContinueOnError)
-	domain := fs.String("domain", "", "restrict to a domain")
-	tags := fs.String("tag", "", "comma-separated tags (match any)")
-	project := fs.String("project", "", "restrict to a project")
-	lifecycle := fs.String("lifecycle", "", "evergreen or expires")
-	since := fs.String("since", "", "updated on/after YYYY-MM-DD")
-	until := fs.String("until", "", "updated on/before YYYY-MM-DD")
-	includeExpired := fs.Bool("include-expired", false, "include expired memories")
-	limit := fs.Int("limit", 20, "max results")
-	if err := fs.Parse(args); err != nil {
+	parsed, err := parseSearchArgs(args)
+	if err != nil {
 		return err
 	}
 
@@ -87,19 +87,14 @@ func Search(args []string) error {
 	}
 	defer e.Close()
 
-	hits, err := e.Search(context.Background(), index.Filter{
-		Query:          strings.Join(fs.Args(), " "),
-		Domain:         *domain,
-		Tags:           splitList(*tags),
-		Project:        *project,
-		Lifecycle:      *lifecycle,
-		Since:          *since,
-		Until:          *until,
-		IncludeExpired: *includeExpired,
-		Limit:          *limit,
-	})
+	hits, err := e.Search(context.Background(), parsed.filter)
 	if err != nil {
 		return err
+	}
+	if parsed.json {
+		return printJSON(struct {
+			Hits []index.Hit `json:"hits"`
+		}{Hits: hits})
 	}
 	if len(hits) == 0 {
 		fmt.Println("no matches")
@@ -111,10 +106,98 @@ func Search(args []string) error {
 	return nil
 }
 
+type searchArgs struct {
+	filter index.Filter
+	json   bool
+}
+
+func parseSearchArgs(args []string) (searchArgs, error) {
+	parsed := searchArgs{filter: index.Filter{Limit: 20}}
+	var query []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		next := func() (string, error) {
+			if i+1 >= len(args) {
+				return "", fmt.Errorf("search: %s requires a value", a)
+			}
+			i++
+			return args[i], nil
+		}
+		switch a {
+		case "--json":
+			parsed.json = true
+		case "--include-expired":
+			parsed.filter.IncludeExpired = true
+		case "--domain":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			parsed.filter.Domain = v
+		case "--tag", "--tags":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			parsed.filter.Tags = append(parsed.filter.Tags, splitList(v)...)
+		case "--project":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			parsed.filter.Project = v
+		case "--lifecycle":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			parsed.filter.Lifecycle = v
+		case "--since":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			parsed.filter.Since = v
+		case "--until":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			parsed.filter.Until = v
+		case "--limit":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			n, err := strconv.Atoi(v)
+			if err != nil {
+				return parsed, fmt.Errorf("search: --limit must be an integer")
+			}
+			parsed.filter.Limit = n
+		default:
+			if strings.HasPrefix(a, "--") {
+				return parsed, fmt.Errorf("search: unknown flag %s", a)
+			}
+			query = append(query, a)
+		}
+	}
+	parsed.filter.Query = strings.Join(query, " ")
+	return parsed, nil
+}
+
 // Get prints a memory's path and full Markdown content.
 func Get(args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("usage: recall get <id>")
+	jsonOut := false
+	var ids []string
+	for _, a := range args {
+		if a == "--json" {
+			jsonOut = true
+			continue
+		}
+		ids = append(ids, a)
+	}
+	if len(ids) != 1 {
+		return fmt.Errorf("usage: recall get <id> [--json]")
 	}
 	e, err := openEngine()
 	if err != nil {
@@ -122,15 +205,57 @@ func Get(args []string) error {
 	}
 	defer e.Close()
 
-	_, relPath, err := e.Get(context.Background(), args[0])
+	m, relPath, err := e.Get(context.Background(), ids[0])
 	if err != nil {
 		return err
+	}
+	if jsonOut {
+		return printJSON(memoryOutput(m, relPath))
 	}
 	data, err := os.ReadFile(filepath.Join(e.Vault().Root(), relPath))
 	if err != nil {
 		return err
 	}
 	fmt.Printf("# %s\n\n%s", filepath.Join("vault", relPath), data)
+	return nil
+}
+
+// Delete removes a memory by id.
+func Delete(args []string) error {
+	jsonOut := false
+	yes := false
+	var ids []string
+	for _, a := range args {
+		switch a {
+		case "--json":
+			jsonOut = true
+		case "--yes", "-y":
+			yes = true
+		default:
+			ids = append(ids, a)
+		}
+	}
+	if len(ids) != 1 {
+		return fmt.Errorf("usage: recall delete <id> --yes")
+	}
+	if !yes {
+		return fmt.Errorf("delete requires --yes")
+	}
+	e, err := openEngine()
+	if err != nil {
+		return err
+	}
+	defer e.Close()
+	if err := e.Delete(context.Background(), ids[0]); err != nil {
+		return err
+	}
+	if jsonOut {
+		return printJSON(struct {
+			ID      string `json:"id"`
+			Deleted bool   `json:"deleted"`
+		}{ID: ids[0], Deleted: true})
+	}
+	fmt.Printf("deleted %s\n", ids[0])
 	return nil
 }
 
@@ -147,9 +272,22 @@ func Domain(args []string) error {
 
 	switch args[0] {
 	case "list":
+		jsonOut := false
+		for _, a := range args[1:] {
+			if a == "--json" {
+				jsonOut = true
+				continue
+			}
+			return fmt.Errorf("usage: recall domain list [--json]")
+		}
 		domains, err := e.Vault().ListDomains()
 		if err != nil {
 			return err
+		}
+		if jsonOut {
+			return printJSON(struct {
+				Domains []domainOutput `json:"domains"`
+			}{Domains: domainOutputs(domains)})
 		}
 		for _, d := range domains {
 			fmt.Printf("%-12s %s\n", d.Name+"/", d.Description)

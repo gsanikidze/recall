@@ -59,6 +59,22 @@ func TestUpsertAndFullTextSearch(t *testing.T) {
 	}
 }
 
+func TestSearchSanitizesFTSOperators(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+	if err := ix.Upsert(ctx, "tools/smoke.md", mem(t, "01FTS", "Smoke memory", "tools", "Smoke memory text")); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	hits, err := ix.Search(ctx, Filter{Query: "Smoke memory --domain tools"})
+	if err != nil {
+		t.Fatalf("Search with hyphen-like user text should not error: %v", err)
+	}
+	if len(hits) != 1 || hits[0].ID != "01FTS" {
+		t.Fatalf("hits = %+v", hits)
+	}
+}
+
 func TestSearchFilters(t *testing.T) {
 	ix := openIndex(t)
 	ctx := context.Background()

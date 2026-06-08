@@ -123,7 +123,7 @@ func (v *Vault) ListDomains() ([]Domain, error) {
 	}
 	var domains []Domain
 	for _, e := range entries {
-		if !e.IsDir() {
+		if !e.IsDir() || !domainNamePattern.MatchString(e.Name()) {
 			continue
 		}
 		domains = append(domains, Domain{

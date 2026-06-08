@@ -53,6 +53,13 @@ func TestScaffoldCreatesDomainsAndIndex(t *testing.T) {
 
 func TestListDomainsParsesDescriptions(t *testing.T) {
 	v := newVault(t)
+	if err := os.MkdirAll(filepath.Join(v.Root(), ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(v.Root(), "Bad Name"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
 	domains, err := v.ListDomains()
 	if err != nil {
 		t.Fatalf("ListDomains: %v", err)
@@ -60,6 +67,9 @@ func TestListDomainsParsesDescriptions(t *testing.T) {
 	got := map[string]string{}
 	for _, d := range domains {
 		got[d.Name] = d.Description
+		if strings.HasPrefix(d.Name, ".") || strings.Contains(d.Name, " ") {
+			t.Fatalf("invalid folder listed as domain: %+v", d)
+		}
 	}
 	if !strings.Contains(got["tools"], "Reusable tools") {
 		t.Errorf("tools description = %q", got["tools"])
@@ -171,5 +181,21 @@ func TestDelete(t *testing.T) {
 	// Deleting a missing file is not an error.
 	if err := v.Delete(rel); err != nil {
 		t.Errorf("Delete missing: %v", err)
+	}
+}
+
+func TestRejectsUnsafeRelativePaths(t *testing.T) {
+	v := newVault(t)
+	m := sampleMemory(t)
+	for _, rel := range []string{"../escape.md", "/tmp/escape.md", "tools/../../escape.md"} {
+		if err := v.WriteAt(rel, m); err == nil {
+			t.Fatalf("WriteAt accepted unsafe path %q", rel)
+		}
+		if _, err := v.Read(rel); err == nil {
+			t.Fatalf("Read accepted unsafe path %q", rel)
+		}
+		if err := v.Delete(rel); err == nil {
+			t.Fatalf("Delete accepted unsafe path %q", rel)
+		}
 	}
 }

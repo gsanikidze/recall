@@ -9,6 +9,15 @@ import (
 	"context"
 )
 
+const deleteFTSForMemory = `-- name: DeleteFTSForMemory :exec
+DELETE FROM memories_fts WHERE id = ?
+`
+
+func (q *Queries) DeleteFTSForMemory(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteFTSForMemory, id)
+	return err
+}
+
 const deleteLinksForMemory = `-- name: DeleteLinksForMemory :exec
 DELETE FROM links WHERE memory_id = ?
 `
@@ -113,6 +122,21 @@ func (q *Queries) GetTagsForMemory(ctx context.Context, memoryID string) ([]stri
 	return items, nil
 }
 
+const insertFTSForMemory = `-- name: InsertFTSForMemory :exec
+INSERT INTO memories_fts (id, title, body) VALUES (?, ?, ?)
+`
+
+type InsertFTSForMemoryParams struct {
+	ID    string
+	Title string
+	Body  string
+}
+
+func (q *Queries) InsertFTSForMemory(ctx context.Context, arg InsertFTSForMemoryParams) error {
+	_, err := q.db.ExecContext(ctx, insertFTSForMemory, arg.ID, arg.Title, arg.Body)
+	return err
+}
+
 const insertLink = `-- name: InsertLink :exec
 INSERT INTO links (memory_id, target_id) VALUES (?, ?)
 `
@@ -200,9 +224,9 @@ type UpsertMemoryParams struct {
 	Body      string
 }
 
-// query.sql holds the static, type-safe queries sqlc generates Go for.
-// Dynamic full-text search (combinable optional filters + FTS5) is hand-written
-// in search.go, which is why no search query appears here.
+// query.sql holds static, type-safe queries sqlc generates Go for.
+// Dynamic full-text search (combinable optional filters + FTS5 MATCH) is
+// hand-written in search.go, which is why no search query appears here.
 func (q *Queries) UpsertMemory(ctx context.Context, arg UpsertMemoryParams) error {
 	_, err := q.db.ExecContext(ctx, upsertMemory,
 		arg.ID,

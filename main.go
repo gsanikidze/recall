@@ -24,15 +24,19 @@ func main() {
 	case "help", "-h", "--help":
 		printHelp()
 	case "init":
-		err = cmd.Init()
+		err = cmd.Init(rest)
 	case "add":
 		err = cmd.Add(rest)
 	case "search":
 		err = cmd.Search(rest)
 	case "get":
 		err = cmd.Get(rest)
+	case "delete", "rm":
+		err = cmd.Delete(rest)
 	case "domain":
 		err = cmd.Domain(rest)
+	case "doctor":
+		err = cmd.Doctor(rest)
 	case "reindex":
 		err = cmd.Reindex(rest)
 	case "mcp":
@@ -59,11 +63,13 @@ Usage:
   recall [command]
 
 Commands:
-  init        Initialize a new recall workspace
+  init        Initialize a new recall workspace (--path DIR --force)
   add         Add a memory (--title --domain --body, or pipe body on stdin)
   search      Search memories (query plus --domain --tag --project filters)
   get         Print a memory by id
+  delete      Delete a memory by id
   domain      Manage domains: domain list | domain add <name> --desc "..."
+  doctor      Check config, vault, SQLite index, and domains
   reindex     Rebuild the SQLite index from the vault
   mcp         Run the MCP server (stdio) for LLM agents
   ui          Start the web UI at localhost:8888 (--port N --no-browser)

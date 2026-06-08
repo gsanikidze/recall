@@ -3,6 +3,7 @@ package index
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -54,13 +55,19 @@ func (ix *Index) Search(ctx context.Context, f Filter) ([]Hit, error) {
 	fts := strings.TrimSpace(f.Query) != ""
 
 	if fts {
-		b.WriteString(`SELECT m.id, m.title, m.path, m.domain,
+		matchQuery := sanitizeFTSQuery(f.Query)
+		if matchQuery == "" {
+			fts = false
+		} else {
+			b.WriteString(`SELECT m.id, m.title, m.path, m.domain,
        snippet(memories_fts, 2, '[', ']', ' … ', 12) AS snippet,
        bm25(memories_fts) AS rank
 FROM memories_fts f JOIN memories m ON m.id = f.id
 WHERE memories_fts MATCH ?`)
-		args = append(args, f.Query)
-	} else {
+			args = append(args, matchQuery)
+		}
+	}
+	if !fts {
 		b.WriteString(`SELECT m.id, m.title, m.path, m.domain,
        substr(m.body, 1, 160) AS snippet,
        0.0 AS rank
@@ -136,4 +143,27 @@ func placeholders(n int) string {
 		return ""
 	}
 	return strings.TrimSuffix(strings.Repeat("?, ", n), ", ")
+}
+
+var ftsToken = regexp.MustCompile(`[\p{L}\p{N}_]+`)
+
+func sanitizeFTSQuery(q string) string {
+	tokens := ftsToken.FindAllString(strings.ToLower(q), -1)
+	if len(tokens) == 0 {
+		return ""
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(tokens))
+	for _, tok := range tokens {
+		if seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		out = append(out, strconvQuote(tok))
+	}
+	return strings.Join(out, " OR ")
+}
+
+func strconvQuote(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }

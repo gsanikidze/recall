@@ -1,6 +1,6 @@
--- query.sql holds the static, type-safe queries sqlc generates Go for.
--- Dynamic full-text search (combinable optional filters + FTS5) is hand-written
--- in search.go, which is why no search query appears here.
+-- query.sql holds static, type-safe queries sqlc generates Go for.
+-- Dynamic full-text search (combinable optional filters + FTS5 MATCH) is
+-- hand-written in search.go, which is why no search query appears here.
 
 -- name: UpsertMemory :exec
 INSERT INTO memories (
@@ -44,3 +44,9 @@ INSERT INTO links (memory_id, target_id) VALUES (?, ?);
 
 -- name: GetLinksForMemory :many
 SELECT target_id FROM links WHERE memory_id = ? ORDER BY target_id;
+
+-- name: DeleteFTSForMemory :exec
+DELETE FROM memories_fts WHERE id = ?;
+
+-- name: InsertFTSForMemory :exec
+INSERT INTO memories_fts (id, title, body) VALUES (?, ?, ?);

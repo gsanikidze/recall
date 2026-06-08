@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import MDEditor from '@uiw/react-md-editor'
 import { Save, Trash2 } from 'lucide-react'
 import { MetadataPanel } from './MetadataPanel'
@@ -17,8 +17,6 @@ export function MemoryEditor({ memory, onSaved, onDeleted }: Props) {
 
   const updateMutation = useUpdateMemory()
   const deleteMutation = useDeleteMemory()
-
-  useEffect(() => { setDraft(memory); setError(null) }, [memory.id])
 
   const handleSave = () => {
     setError(null)

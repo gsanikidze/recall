@@ -66,6 +66,7 @@ function AppShell() {
         editor={
           selectedMemory ? (
             <MemoryEditor
+              key={selectedMemory.id}
               memory={selectedMemory}
               onSaved={handleSaved}
               onDeleted={handleDeleted}

@@ -9,6 +9,12 @@ type Link struct {
 	TargetID string
 }
 
+type MemoriesFt struct {
+	ID    string
+	Title string
+	Body  string
+}
+
 type Memory struct {
 	ID        string
 	Path      string
