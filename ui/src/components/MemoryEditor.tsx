@@ -20,6 +20,11 @@ export function MemoryEditor({ memory, onSaved, onDeleted }: Props) {
 
   const handleSave = () => {
     setError(null)
+    if (draft.lifecycle === 'expires' && !draft.expires_on) {
+      setError('Expiry date is required when lifecycle is expires.')
+      return
+    }
+    const expiresOn = draft.lifecycle === 'evergreen' ? '' : draft.expires_on
     updateMutation.mutate(
       {
         id: memory.id,
@@ -29,7 +34,7 @@ export function MemoryEditor({ memory, onSaved, onDeleted }: Props) {
           tags: draft.tags,
           project: draft.project,
           lifecycle: draft.lifecycle,
-          expires_on: draft.expires_on,
+          expires_on: expiresOn,
           source: draft.source,
           links: draft.links,
         },
@@ -68,6 +73,7 @@ export function MemoryEditor({ memory, onSaved, onDeleted }: Props) {
       {/* Title */}
       <div className="px-4 pt-4 pb-2 border-b border-white/5">
         <input
+          aria-label="Memory title"
           value={draft.title}
           onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
           className="w-full bg-transparent text-lg font-semibold text-white/90 placeholder:text-white/30 focus:outline-none"

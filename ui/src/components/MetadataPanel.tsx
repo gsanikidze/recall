@@ -30,6 +30,7 @@ export function MetadataPanel({ memory, onChange }: Props) {
           <div className="col-span-2">
             <label className="text-white/40 block mb-1">Tags (comma-separated)</label>
             <input
+              aria-label="Tags"
               value={memory.tags.join(', ')}
               onChange={e => setTags(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white/80 focus:outline-none focus:border-violet-500/50"
@@ -39,6 +40,7 @@ export function MetadataPanel({ memory, onChange }: Props) {
           <div>
             <label className="text-white/40 block mb-1">Project</label>
             <input
+              aria-label="Project"
               value={memory.project}
               onChange={e => onChange({ project: e.target.value })}
               className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white/80 focus:outline-none focus:border-violet-500/50"
@@ -48,6 +50,7 @@ export function MetadataPanel({ memory, onChange }: Props) {
           <div>
             <label className="text-white/40 block mb-1">Lifecycle</label>
             <select
+              aria-label="Lifecycle"
               value={memory.lifecycle}
               onChange={e => onChange({ lifecycle: e.target.value as MemoryDetail['lifecycle'] })}
               className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white/80 focus:outline-none focus:border-violet-500/50"
@@ -61,6 +64,7 @@ export function MetadataPanel({ memory, onChange }: Props) {
             <div>
               <label className="text-white/40 block mb-1">Expires on</label>
               <input
+                aria-label="Expires on"
                 type="date"
                 value={memory.expires_on}
                 onChange={e => onChange({ expires_on: e.target.value })}
@@ -72,6 +76,7 @@ export function MetadataPanel({ memory, onChange }: Props) {
           <div>
             <label className="text-white/40 block mb-1">Source</label>
             <input
+              aria-label="Source"
               value={memory.source}
               onChange={e => onChange({ source: e.target.value })}
               className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white/80 focus:outline-none focus:border-violet-500/50"
