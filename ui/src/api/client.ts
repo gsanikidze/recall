@@ -3,17 +3,32 @@ import type {
   CreateMemoryParams, UpdateMemoryParams,
 } from './types'
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers)
+  headers.set('Accept', 'application/json')
+  if (init.body != null && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
     ...init,
+    headers,
   })
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error ?? `HTTP ${res.status}`)
+    const contentType = res.headers.get('Content-Type') ?? ''
+    if (contentType.includes('application/json')) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    const text = await res.text().catch(() => '')
+    throw new Error(text || `HTTP ${res.status}`)
   }
   if (res.status === 204) return undefined as T
   return res.json()
+}
+
+function encodePathParam(value: string) {
+  return encodeURIComponent(value)
 }
 
 export async function listDomains(signal?: AbortSignal): Promise<Domain[]> {
@@ -37,7 +52,7 @@ export async function listMemories(filter: MemoryFilter = {}, signal?: AbortSign
 }
 
 export async function getMemory(id: string, signal?: AbortSignal): Promise<MemoryDetail> {
-  return request<MemoryDetail>(`/api/memories/${id}`, { signal })
+  return request<MemoryDetail>(`/api/memories/${encodePathParam(id)}`, { signal })
 }
 
 export async function createMemory(params: CreateMemoryParams): Promise<{ id: string; path: string }> {
@@ -45,14 +60,14 @@ export async function createMemory(params: CreateMemoryParams): Promise<{ id: st
 }
 
 export async function updateMemory(id: string, params: UpdateMemoryParams): Promise<MemoryDetail> {
-  return request<MemoryDetail>(`/api/memories/${id}`, {
+  return request<MemoryDetail>(`/api/memories/${encodePathParam(id)}`, {
     method: 'PUT',
     body: JSON.stringify(params),
   })
 }
 
 export async function deleteMemory(id: string): Promise<void> {
-  return request(`/api/memories/${id}`, { method: 'DELETE' })
+  return request(`/api/memories/${encodePathParam(id)}`, { method: 'DELETE' })
 }
 
 export async function reindex(): Promise<{ indexed: number; deleted: number }> {
