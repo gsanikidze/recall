@@ -62,9 +62,12 @@ describe('api client', () => {
   it('sets Content-Type only when a body exists', async () => {
     const fetchMock = mockFetch(jsonResponse({ id: '01ABC', path: 'tools/x.md' }))
 
-    await createMemory({ title: 'x', body: 'y', domain: 'tools' })
+    await createMemory({ title: 'x', body: 'y', domain: 'tools', importance: 5 })
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/memories', expect.objectContaining({ method: 'POST' }))
+    expect(fetchMock).toHaveBeenCalledWith('/api/memories', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ title: 'x', body: 'y', domain: 'tools', importance: 5 }),
+    }))
     expect(requestHeaders(fetchMock).get('Content-Type')).toBe('application/json')
 
     fetchMock.mockClear()

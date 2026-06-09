@@ -80,7 +80,7 @@ func TestAddSearchGetDeleteJSONFlow(t *testing.T) {
 	}
 
 	out = captureStdout(t, func() {
-		if err := Add([]string{"--title", "Smoke Memory", "--domain", "tools", "--body", "Smoke memory text", "--json"}); err != nil {
+		if err := Add([]string{"--title", "Smoke Memory", "--domain", "tools", "--body", "Smoke memory text", "--importance", "5", "--json"}); err != nil {
 			t.Fatalf("Add: %v", err)
 		}
 	})
@@ -97,7 +97,7 @@ func TestAddSearchGetDeleteJSONFlow(t *testing.T) {
 			t.Fatalf("Search flags-after-query: %v", err)
 		}
 	})
-	if !strings.Contains(out, id) || !strings.Contains(out, `"hits"`) {
+	if !strings.Contains(out, id) || !strings.Contains(out, `"hits"`) || !strings.Contains(out, `"importance": 5`) {
 		t.Fatalf("search json output = %s", out)
 	}
 
@@ -106,7 +106,7 @@ func TestAddSearchGetDeleteJSONFlow(t *testing.T) {
 			t.Fatalf("Get json: %v", err)
 		}
 	})
-	if !strings.Contains(out, `"body"`) || !strings.Contains(out, "Smoke memory text") {
+	if !strings.Contains(out, `"body"`) || !strings.Contains(out, "Smoke memory text") || !strings.Contains(out, `"importance": 5`) {
 		t.Fatalf("get json output = %s", out)
 	}
 

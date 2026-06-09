@@ -59,6 +59,22 @@ export function MetadataPanel({ memory, onChange }: Props) {
               <option value="expires">expires</option>
             </select>
           </div>
+          {/* Importance */}
+          <div>
+            <label className="text-white/40 block mb-1">Importance</label>
+            <select
+              aria-label="Importance"
+              value={memory.importance}
+              onChange={e => onChange({ importance: Number(e.target.value) })}
+              className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white/80 focus:outline-none focus:border-violet-500/50"
+            >
+              <option value={1}>1 — low</option>
+              <option value={2}>2 — useful</option>
+              <option value={3}>3 — default</option>
+              <option value={4}>4 — high</option>
+              <option value={5}>5 — critical</option>
+            </select>
+          </div>
           {/* Expires on */}
           {memory.lifecycle === 'expires' && (
             <div>

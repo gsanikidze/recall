@@ -22,13 +22,14 @@ func sampleMemory(t *testing.T) memory.Memory {
 	t.Helper()
 	d, _ := memory.ParseDate("2026-06-07")
 	return memory.Memory{
-		ID:        memory.NewID(),
-		Title:     "Kamal deploy",
-		Domain:    "tools",
-		Created:   d,
-		Updated:   d,
-		Lifecycle: memory.Evergreen,
-		Body:      "Use Kamal.",
+		ID:         memory.NewID(),
+		Title:      "Kamal deploy",
+		Domain:     "tools",
+		Created:    d,
+		Updated:    d,
+		Importance: 3,
+		Lifecycle:  memory.Evergreen,
+		Body:       "Use Kamal.",
 	}
 }
 

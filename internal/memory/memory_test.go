@@ -16,15 +16,16 @@ func mustDate(t *testing.T, s string) Date {
 
 func sampleMemory(t *testing.T) Memory {
 	return Memory{
-		ID:        "01J8X3QH000000000000000000",
-		Title:     "Production deploys use Kamal, not Compose",
-		Domain:    "tools",
-		Tags:      []string{"deploy", "infra"},
-		Created:   mustDate(t, "2026-06-07"),
-		Updated:   mustDate(t, "2026-06-07"),
-		Lifecycle: Evergreen,
-		Source:    "claude-code",
-		Body:      "Production deploys run through Kamal; Compose is local-dev only.",
+		ID:         "01J8X3QH000000000000000000",
+		Title:      "Production deploys use Kamal, not Compose",
+		Domain:     "tools",
+		Tags:       []string{"deploy", "infra"},
+		Created:    mustDate(t, "2026-06-07"),
+		Updated:    mustDate(t, "2026-06-07"),
+		Importance: 3,
+		Lifecycle:  Evergreen,
+		Source:     "claude-code",
+		Body:       "Production deploys run through Kamal; Compose is local-dev only.",
 	}
 }
 
@@ -99,6 +100,67 @@ func TestExpiresRoundTrip(t *testing.T) {
 	}
 	if got.ExpiresOn.String() != "2026-12-31" {
 		t.Errorf("expires_on = %q, want 2026-12-31", got.ExpiresOn.String())
+	}
+}
+
+func TestParseMemoryWithImportance(t *testing.T) {
+	data := []byte(`---
+id: 01KTIMPORTANCE0000000000001
+title: Critical Hermes Recall MCP config
+domain: tools
+project: recall
+created: "2026-06-09"
+updated: "2026-06-09"
+lifecycle: evergreen
+importance: 5
+---
+
+Recall MCP config is critical operating context.
+`)
+
+	got, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got.Importance != 5 {
+		t.Fatalf("importance = %d, want 5", got.Importance)
+	}
+}
+
+func TestParseDefaultsImportance(t *testing.T) {
+	data, err := sampleMemory(t).Marshal()
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	withoutImportance := strings.ReplaceAll(string(data), "importance: 3\n", "")
+
+	got, err := Parse([]byte(withoutImportance))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got.Importance != 3 {
+		t.Fatalf("importance = %d, want default 3", got.Importance)
+	}
+}
+
+func TestValidateImportance(t *testing.T) {
+	for _, importance := range []int{1, 3, 5} {
+		t.Run("valid", func(t *testing.T) {
+			m := sampleMemory(t)
+			m.Importance = importance
+			if err := m.Validate(); err != nil {
+				t.Fatalf("importance %d should be valid: %v", importance, err)
+			}
+		})
+	}
+	for _, importance := range []int{0, 6} {
+		t.Run("invalid", func(t *testing.T) {
+			m := sampleMemory(t)
+			m.Importance = importance
+			if err := m.Validate(); err == nil {
+				t.Fatalf("importance %d should be invalid", importance)
+			}
+		})
 	}
 }
 

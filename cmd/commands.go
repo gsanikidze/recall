@@ -27,6 +27,7 @@ func Add(args []string) error {
 	expires := fs.String("expires", "", "expiry date YYYY-MM-DD (with --lifecycle expires)")
 	source := fs.String("source", "", "who/what produced this memory")
 	links := fs.String("links", "", "comma-separated related memory ids")
+	importance := fs.Int("importance", 0, "importance rank 1-5 (default 3)")
 	jsonOut := fs.Bool("json", false, "print JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -51,15 +52,16 @@ func Add(args []string) error {
 	defer e.Close()
 
 	m, relPath, err := e.Add(context.Background(), recall.AddParams{
-		Title:     *title,
-		Body:      text,
-		Domain:    *domain,
-		Tags:      splitList(*tags),
-		Project:   *project,
-		Lifecycle: *lifecycle,
-		ExpiresOn: *expires,
-		Source:    *source,
-		Links:     splitList(*links),
+		Title:      *title,
+		Body:       text,
+		Domain:     *domain,
+		Tags:       splitList(*tags),
+		Project:    *project,
+		Lifecycle:  *lifecycle,
+		ExpiresOn:  *expires,
+		Source:     *source,
+		Links:      splitList(*links),
+		Importance: *importance,
 	})
 	if err != nil {
 		return err

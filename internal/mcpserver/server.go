@@ -42,7 +42,8 @@ func register(server *mcp.Server, e *recall.Engine) {
 		Description: "Store a new memory. Only store durable, decision-relevant facts worth recalling " +
 			"later — not transient chatter. Choose `domain` by first calling recall_list_domains and " +
 			"reading what each domain is for. Use lifecycle 'evergreen' for facts that don't decay " +
-			"(tools, people) and 'expires' with expires_on for time-bound facts.",
+			"(tools, people) and 'expires' with expires_on for time-bound facts. Choose importance " +
+			"automatically: 1 low, 2 useful, 3 default durable, 4 high-value, 5 critical operating fact/preference/path.",
 	}, addHandler(e))
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -77,12 +78,13 @@ type searchArgs struct {
 }
 
 type hitOut struct {
-	ID      string  `json:"id"`
-	Title   string  `json:"title"`
-	Domain  string  `json:"domain"`
-	Snippet string  `json:"snippet"`
-	Path    string  `json:"path"`
-	Score   float64 `json:"score"`
+	ID         string  `json:"id"`
+	Title      string  `json:"title"`
+	Domain     string  `json:"domain"`
+	Snippet    string  `json:"snippet"`
+	Path       string  `json:"path"`
+	Importance int     `json:"importance"`
+	Score      float64 `json:"score"`
 }
 
 type searchOut struct {
@@ -109,7 +111,7 @@ func searchHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest,
 		for _, h := range hits {
 			out.Hits = append(out.Hits, hitOut{
 				ID: h.ID, Title: h.Title, Domain: h.Domain,
-				Snippet: h.Snippet, Path: h.Path, Score: h.Score,
+				Snippet: h.Snippet, Path: h.Path, Importance: h.Importance, Score: h.Score,
 			})
 		}
 		return jsonResult(out), out, nil
@@ -123,19 +125,20 @@ type getArgs struct {
 }
 
 type getOut struct {
-	ID        string   `json:"id"`
-	Title     string   `json:"title"`
-	Domain    string   `json:"domain"`
-	Tags      []string `json:"tags,omitempty"`
-	Project   string   `json:"project,omitempty"`
-	Lifecycle string   `json:"lifecycle"`
-	ExpiresOn string   `json:"expires_on,omitempty"`
-	Created   string   `json:"created"`
-	Updated   string   `json:"updated"`
-	Source    string   `json:"source,omitempty"`
-	Links     []string `json:"links,omitempty"`
-	Path      string   `json:"path"`
-	Body      string   `json:"body"`
+	ID         string   `json:"id"`
+	Title      string   `json:"title"`
+	Domain     string   `json:"domain"`
+	Tags       []string `json:"tags,omitempty"`
+	Project    string   `json:"project,omitempty"`
+	Lifecycle  string   `json:"lifecycle"`
+	ExpiresOn  string   `json:"expires_on,omitempty"`
+	Created    string   `json:"created"`
+	Updated    string   `json:"updated"`
+	Source     string   `json:"source,omitempty"`
+	Links      []string `json:"links,omitempty"`
+	Importance int      `json:"importance"`
+	Path       string   `json:"path"`
+	Body       string   `json:"body"`
 }
 
 func getHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest, getArgs) (*mcp.CallToolResult, getOut, error) {
@@ -148,7 +151,7 @@ func getHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest, ge
 			ID: m.ID, Title: m.Title, Domain: m.Domain, Tags: m.Tags, Project: m.Project,
 			Lifecycle: string(m.Lifecycle), ExpiresOn: m.ExpiresOn.String(),
 			Created: m.Created.String(), Updated: m.Updated.String(),
-			Source: m.Source, Links: m.Links, Path: relPath, Body: m.Body,
+			Source: m.Source, Links: m.Links, Importance: m.Importance, Path: relPath, Body: m.Body,
 		}
 		return jsonResult(out), out, nil
 	}
@@ -157,15 +160,16 @@ func getHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest, ge
 // ---- recall_add ----
 
 type addArgs struct {
-	Title     string   `json:"title" jsonschema:"short headline for the fact"`
-	Body      string   `json:"body" jsonschema:"the fact itself, written tersely (Markdown allowed)"`
-	Domain    string   `json:"domain" jsonschema:"target domain folder; see recall_list_domains"`
-	Tags      []string `json:"tags,omitempty" jsonschema:"free-form labels"`
-	Project   string   `json:"project,omitempty" jsonschema:"project grouping key"`
-	Lifecycle string   `json:"lifecycle,omitempty" jsonschema:"evergreen (default) or expires"`
-	ExpiresOn string   `json:"expires_on,omitempty" jsonschema:"expiry date YYYY-MM-DD; required when lifecycle is expires"`
-	Source    string   `json:"source,omitempty" jsonschema:"who or what produced this memory"`
-	Links     []string `json:"links,omitempty" jsonschema:"ids of related memories"`
+	Title      string   `json:"title" jsonschema:"short headline for the fact"`
+	Body       string   `json:"body" jsonschema:"the fact itself, written tersely (Markdown allowed)"`
+	Domain     string   `json:"domain" jsonschema:"target domain folder; see recall_list_domains"`
+	Tags       []string `json:"tags,omitempty" jsonschema:"free-form labels"`
+	Project    string   `json:"project,omitempty" jsonschema:"project grouping key"`
+	Lifecycle  string   `json:"lifecycle,omitempty" jsonschema:"evergreen (default) or expires"`
+	ExpiresOn  string   `json:"expires_on,omitempty" jsonschema:"expiry date YYYY-MM-DD; required when lifecycle is expires"`
+	Source     string   `json:"source,omitempty" jsonschema:"who or what produced this memory"`
+	Links      []string `json:"links,omitempty" jsonschema:"ids of related memories"`
+	Importance int      `json:"importance,omitempty" jsonschema:"1-5; choose automatically based on durable value: 1 low, 3 default, 5 critical"`
 }
 
 type addOut struct {
@@ -177,7 +181,7 @@ func addHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest, ad
 	return func(ctx context.Context, _ *mcp.CallToolRequest, a addArgs) (*mcp.CallToolResult, addOut, error) {
 		m, relPath, err := e.Add(ctx, recall.AddParams{
 			Title: a.Title, Body: a.Body, Domain: a.Domain, Tags: a.Tags, Project: a.Project,
-			Lifecycle: a.Lifecycle, ExpiresOn: a.ExpiresOn, Source: a.Source, Links: a.Links,
+			Lifecycle: a.Lifecycle, ExpiresOn: a.ExpiresOn, Source: a.Source, Links: a.Links, Importance: a.Importance,
 		})
 		if err != nil {
 			return nil, addOut{}, err
@@ -190,22 +194,23 @@ func addHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest, ad
 // ---- recall_update ----
 
 type updateArgs struct {
-	ID        string    `json:"id" jsonschema:"id of the memory to update"`
-	Title     *string   `json:"title,omitempty"`
-	Body      *string   `json:"body,omitempty"`
-	Tags      *[]string `json:"tags,omitempty"`
-	Project   *string   `json:"project,omitempty"`
-	Lifecycle *string   `json:"lifecycle,omitempty"`
-	ExpiresOn *string   `json:"expires_on,omitempty"`
-	Source    *string   `json:"source,omitempty"`
-	Links     *[]string `json:"links,omitempty"`
+	ID         string    `json:"id" jsonschema:"id of the memory to update"`
+	Title      *string   `json:"title,omitempty"`
+	Body       *string   `json:"body,omitempty"`
+	Tags       *[]string `json:"tags,omitempty"`
+	Project    *string   `json:"project,omitempty"`
+	Lifecycle  *string   `json:"lifecycle,omitempty"`
+	ExpiresOn  *string   `json:"expires_on,omitempty"`
+	Source     *string   `json:"source,omitempty"`
+	Links      *[]string `json:"links,omitempty"`
+	Importance *int      `json:"importance,omitempty"`
 }
 
 func updateHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest, updateArgs) (*mcp.CallToolResult, addOut, error) {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, a updateArgs) (*mcp.CallToolResult, addOut, error) {
 		m, relPath, err := e.Update(ctx, a.ID, recall.UpdateParams{
 			Title: a.Title, Body: a.Body, Tags: a.Tags, Project: a.Project,
-			Lifecycle: a.Lifecycle, ExpiresOn: a.ExpiresOn, Source: a.Source, Links: a.Links,
+			Lifecycle: a.Lifecycle, ExpiresOn: a.ExpiresOn, Source: a.Source, Links: a.Links, Importance: a.Importance,
 		})
 		if err != nil {
 			return nil, addOut{}, err

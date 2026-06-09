@@ -14,6 +14,7 @@ export interface MemoryHit {
   domain: string
   snippet: string
   path: string
+  importance: number
   score: number
 }
 
@@ -31,6 +32,7 @@ export interface MemoryDetail {
   updated: string
   source: string
   links: string[]
+  importance: number
   path: string
   body: string
 }
@@ -57,6 +59,7 @@ export interface CreateMemoryParams {
   expires_on?: string
   source?: string
   links?: string[]
+  importance?: number
 }
 
 export interface UpdateMemoryParams {
@@ -68,4 +71,5 @@ export interface UpdateMemoryParams {
   expires_on?: string
   source?: string
   links?: string[]
+  importance?: number
 }

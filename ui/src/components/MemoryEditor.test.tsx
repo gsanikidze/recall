@@ -31,6 +31,7 @@ function memory(overrides: Partial<MemoryDetail> = {}): MemoryDetail {
     updated: '2026-06-08',
     source: '',
     links: [],
+    importance: 3,
     path: 'tools/original.md',
     body: 'Original body',
     ...overrides,
@@ -88,5 +89,21 @@ describe('MemoryEditor expiry validation', () => {
     const event = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('saves changed importance from metadata panel', async () => {
+    const user = userEvent.setup()
+    render(<MemoryEditor memory={memory({ importance: 3 })} onSaved={vi.fn()} onDeleted={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /metadata/i }))
+    await user.selectOptions(screen.getByLabelText(/importance/i), '5')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(updateMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ importance: 5 }),
+      }),
+      expect.any(Object),
+    )
   })
 })

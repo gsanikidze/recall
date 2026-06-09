@@ -124,10 +124,11 @@ func TestMCPAddSearchGetFlow(t *testing.T) {
 	// add
 	var added addOut
 	call(t, s, "recall_add", map[string]any{
-		"title":  "Kamal deploy",
-		"body":   "Deploys run through **Kamal**.",
-		"domain": "tools",
-		"tags":   []string{"deploy"},
+		"title":      "Kamal deploy",
+		"body":       "Deploys run through **Kamal**.",
+		"domain":     "tools",
+		"tags":       []string{"deploy"},
+		"importance": 5,
 	}, &added)
 	if added.ID == "" || added.Path == "" {
 		t.Fatalf("add returned empty: %+v", added)
@@ -136,14 +137,14 @@ func TestMCPAddSearchGetFlow(t *testing.T) {
 	// search
 	var search searchOut
 	call(t, s, "recall_search", map[string]any{"query": "kamal"}, &search)
-	if len(search.Hits) != 1 || search.Hits[0].ID != added.ID {
+	if len(search.Hits) != 1 || search.Hits[0].ID != added.ID || search.Hits[0].Importance != 5 {
 		t.Fatalf("search = %+v", search)
 	}
 
 	// get
 	var got getOut
 	call(t, s, "recall_get", map[string]any{"id": added.ID}, &got)
-	if got.Title != "Kamal deploy" || got.Domain != "tools" {
+	if got.Title != "Kamal deploy" || got.Domain != "tools" || got.Importance != 5 {
 		t.Fatalf("get = %+v", got)
 	}
 	// Full Markdown body is returned to the agent, formatting intact.
@@ -152,10 +153,10 @@ func TestMCPAddSearchGetFlow(t *testing.T) {
 	}
 
 	// update
-	call(t, s, "recall_update", map[string]any{"id": added.ID, "body": "Now uses Kamal v2 and widgets."}, nil)
+	call(t, s, "recall_update", map[string]any{"id": added.ID, "body": "Now uses Kamal v2 and widgets.", "importance": 4}, nil)
 	var search2 searchOut
 	call(t, s, "recall_search", map[string]any{"query": "widgets"}, &search2)
-	if len(search2.Hits) != 1 {
+	if len(search2.Hits) != 1 || search2.Hits[0].Importance != 4 {
 		t.Fatalf("search after update = %+v", search2)
 	}
 }

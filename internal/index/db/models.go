@@ -16,17 +16,18 @@ type MemoriesFt struct {
 }
 
 type Memory struct {
-	ID        string
-	Path      string
-	Title     string
-	Domain    string
-	Project   string
-	Source    string
-	Lifecycle string
-	ExpiresOn string
-	Created   string
-	Updated   string
-	Body      string
+	ID         string
+	Path       string
+	Title      string
+	Domain     string
+	Project    string
+	Source     string
+	Lifecycle  string
+	ExpiresOn  string
+	Created    string
+	Updated    string
+	Importance int64
+	Body       string
 }
 
 type Tag struct {

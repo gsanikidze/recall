@@ -4,8 +4,8 @@
 
 -- name: UpsertMemory :exec
 INSERT INTO memories (
-    id, path, title, domain, project, source, lifecycle, expires_on, created, updated, body
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    id, path, title, domain, project, source, lifecycle, expires_on, created, updated, importance, body
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     path       = excluded.path,
     title      = excluded.title,
@@ -16,6 +16,7 @@ ON CONFLICT(id) DO UPDATE SET
     expires_on = excluded.expires_on,
     created    = excluded.created,
     updated    = excluded.updated,
+    importance = excluded.importance,
     body       = excluded.body;
 
 -- name: GetMemory :one

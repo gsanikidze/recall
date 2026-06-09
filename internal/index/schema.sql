@@ -16,6 +16,7 @@ CREATE TABLE memories (
     expires_on  TEXT NOT NULL DEFAULT '',
     created     TEXT NOT NULL,
     updated     TEXT NOT NULL,
+    importance  INTEGER NOT NULL DEFAULT 3,
     body        TEXT NOT NULL
 );
 

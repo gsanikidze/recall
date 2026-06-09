@@ -61,6 +61,60 @@ func TestUpsertAndFullTextSearch(t *testing.T) {
 	}
 }
 
+func TestSearchReturnsImportance(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	m := mem(t, "01IMP", "Critical Recall config", "tools", "recall config path")
+	m.Importance = 5
+	if err := ix.Upsert(ctx, "tools/critical.md", m); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	hits, err := ix.Search(ctx, Filter{Query: "recall config"})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(hits) != 1 {
+		t.Fatalf("got %d hits, want 1: %+v", len(hits), hits)
+	}
+	if hits[0].Importance != 5 {
+		t.Fatalf("importance = %d, want 5", hits[0].Importance)
+	}
+}
+
+func TestSearchImportanceRanking(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	low := mem(t, "01LOW", "Recall config low", "tools", "same ranking text")
+	low.Importance = 1
+	high := mem(t, "01HIGH", "Recall config high", "tools", "same ranking text")
+	high.Importance = 5
+	for _, item := range []struct {
+		path string
+		m    memory.Memory
+	}{
+		{"tools/low.md", low},
+		{"tools/high.md", high},
+	} {
+		if err := ix.Upsert(ctx, item.path, item.m); err != nil {
+			t.Fatalf("Upsert %s: %v", item.m.ID, err)
+		}
+	}
+
+	hits, err := ix.Search(ctx, Filter{Query: "ranking"})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(hits) < 2 {
+		t.Fatalf("got %d hits, want at least 2: %+v", len(hits), hits)
+	}
+	if hits[0].ID != "01HIGH" {
+		t.Fatalf("top hit = %s, want high-importance memory; hits=%+v", hits[0].ID, hits)
+	}
+}
+
 func TestSearchSanitizesFTSOperators(t *testing.T) {
 	ix := openIndex(t)
 	ctx := context.Background()

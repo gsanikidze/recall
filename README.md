@@ -67,7 +67,7 @@ Environment variables override saved config and are useful for tests, temporary 
 Add memory:
 
 ```bash
-recall add --title "SQLite WAL note" --domain tools --tags sqlite,go --body "Use WAL plus busy_timeout for local concurrent reads/writes."
+recall add --title "SQLite WAL note" --domain tools --tags sqlite,go --importance 4 --body "Use WAL plus busy_timeout for local concurrent reads/writes."
 ```
 
 Pipe body from stdin:
@@ -82,6 +82,8 @@ Search:
 recall search sqlite --domain tools --limit 10
 recall search --tag go --project recall --json
 ```
+
+Importance is an integer from 1–5. `3` is default durable memory; `5` is critical operating context such as stable paths, preferences, and integration configs. Search ranking blends full-text relevance, recency, and importance.
 
 Get memory:
 

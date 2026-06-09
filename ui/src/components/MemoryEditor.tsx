@@ -38,6 +38,7 @@ export function MemoryEditor({ memory, onSaved, onDeleted, onDirtyChange }: Prop
           expires_on: expiresOn,
           source: draft.source,
           links: draft.links,
+          importance: draft.importance,
         },
       },
       {
@@ -63,6 +64,7 @@ export function MemoryEditor({ memory, onSaved, onDeleted, onDirtyChange }: Prop
     draft.lifecycle !== memory.lifecycle ||
     draft.expires_on !== memory.expires_on ||
     draft.source !== memory.source ||
+    draft.importance !== memory.importance ||
     draft.tags.join('\0') !== memory.tags.join('\0') ||
     draft.links.join('\0') !== memory.links.join('\0')
 

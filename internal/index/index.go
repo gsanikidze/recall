@@ -93,19 +93,24 @@ func (ix *Index) Upsert(ctx context.Context, relPath string, m memory.Memory) er
 	qtx := ix.q.WithTx(tx)
 
 	raw := StripMarkdown(m.Body)
+	importance := m.Importance
+	if importance == 0 {
+		importance = 3
+	}
 
 	if err := qtx.UpsertMemory(ctx, db.UpsertMemoryParams{
-		ID:        m.ID,
-		Path:      relPath,
-		Title:     m.Title,
-		Domain:    m.Domain,
-		Project:   m.Project,
-		Source:    m.Source,
-		Lifecycle: string(m.Lifecycle),
-		ExpiresOn: m.ExpiresOn.String(),
-		Created:   m.Created.String(),
-		Updated:   m.Updated.String(),
-		Body:      raw,
+		ID:         m.ID,
+		Path:       relPath,
+		Title:      m.Title,
+		Domain:     m.Domain,
+		Project:    m.Project,
+		Source:     m.Source,
+		Lifecycle:  string(m.Lifecycle),
+		ExpiresOn:  m.ExpiresOn.String(),
+		Created:    m.Created.String(),
+		Updated:    m.Updated.String(),
+		Importance: int64(importance),
+		Body:       raw,
 	}); err != nil {
 		return fmt.Errorf("index: upsert memory: %w", err)
 	}

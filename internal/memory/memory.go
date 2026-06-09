@@ -29,34 +29,36 @@ const (
 
 // Memory is a single recall record: one fact, stored as one Markdown file.
 type Memory struct {
-	ID        string    // ULID, links the MD file to its SQLite row
-	Title     string    // short headline
-	Domain    string    // folder name (tools, people, projects, ...)
-	Tags      []string  // free-form labels
-	Project   string    // optional grouping key (e.g. "acme")
-	Created   Date      // creation date
-	Updated   Date      // last-modified date
-	Lifecycle Lifecycle // evergreen | expires
-	ExpiresOn Date      // hard expiry date; required iff Lifecycle == Expires
-	Source    string    // who/what produced it: agent name, person, or URL
-	Links     []string  // ids of related memories
-	Body      string    // the fact itself, as Markdown
+	ID         string    // ULID, links the MD file to its SQLite row
+	Title      string    // short headline
+	Domain     string    // folder name (tools, people, projects, ...)
+	Tags       []string  // free-form labels
+	Project    string    // optional grouping key (e.g. "acme")
+	Created    Date      // creation date
+	Updated    Date      // last-modified date
+	Importance int       // 1 (low) through 5 (critical), defaults to 3
+	Lifecycle  Lifecycle // evergreen | expires
+	ExpiresOn  Date      // hard expiry date; required iff Lifecycle == Expires
+	Source     string    // who/what produced it: agent name, person, or URL
+	Links      []string  // ids of related memories
+	Body       string    // the fact itself, as Markdown
 }
 
 // frontmatter is the YAML header serialized at the top of each memory file.
 // Optional fields use omitempty so emitted files stay clean.
 type frontmatter struct {
-	ID        string   `yaml:"id"`
-	Title     string   `yaml:"title"`
-	Domain    string   `yaml:"domain"`
-	Tags      []string `yaml:"tags,omitempty"`
-	Project   string   `yaml:"project,omitempty"`
-	Created   Date     `yaml:"created"`
-	Updated   Date     `yaml:"updated"`
-	Lifecycle string   `yaml:"lifecycle"`
-	ExpiresOn *Date    `yaml:"expires_on,omitempty"`
-	Source    string   `yaml:"source,omitempty"`
-	Links     []string `yaml:"links,omitempty"`
+	ID         string   `yaml:"id"`
+	Title      string   `yaml:"title"`
+	Domain     string   `yaml:"domain"`
+	Tags       []string `yaml:"tags,omitempty"`
+	Project    string   `yaml:"project,omitempty"`
+	Created    Date     `yaml:"created"`
+	Updated    Date     `yaml:"updated"`
+	Importance int      `yaml:"importance,omitempty"`
+	Lifecycle  string   `yaml:"lifecycle"`
+	ExpiresOn  *Date    `yaml:"expires_on,omitempty"`
+	Source     string   `yaml:"source,omitempty"`
+	Links      []string `yaml:"links,omitempty"`
 }
 
 // NewID returns a fresh lexicographically-sortable ULID string.
@@ -117,17 +119,21 @@ func Parse(data []byte) (Memory, error) {
 	}
 
 	m := Memory{
-		ID:        fm.ID,
-		Title:     fm.Title,
-		Domain:    fm.Domain,
-		Tags:      fm.Tags,
-		Project:   fm.Project,
-		Created:   fm.Created,
-		Updated:   fm.Updated,
-		Lifecycle: Lifecycle(fm.Lifecycle),
-		Source:    fm.Source,
-		Links:     fm.Links,
-		Body:      strings.TrimSpace(body) + "\n",
+		ID:         fm.ID,
+		Title:      fm.Title,
+		Domain:     fm.Domain,
+		Tags:       fm.Tags,
+		Project:    fm.Project,
+		Created:    fm.Created,
+		Updated:    fm.Updated,
+		Importance: fm.Importance,
+		Lifecycle:  Lifecycle(fm.Lifecycle),
+		Source:     fm.Source,
+		Links:      fm.Links,
+		Body:       strings.TrimSpace(body) + "\n",
+	}
+	if m.Importance == 0 {
+		m.Importance = 3
 	}
 	if fm.ExpiresOn != nil {
 		m.ExpiresOn = *fm.ExpiresOn
@@ -138,16 +144,17 @@ func Parse(data []byte) (Memory, error) {
 // Marshal renders the memory back to its on-disk Markdown+frontmatter form.
 func (m Memory) Marshal() ([]byte, error) {
 	fm := frontmatter{
-		ID:        m.ID,
-		Title:     m.Title,
-		Domain:    m.Domain,
-		Tags:      m.Tags,
-		Project:   m.Project,
-		Created:   m.Created,
-		Updated:   m.Updated,
-		Lifecycle: string(m.Lifecycle),
-		Source:    m.Source,
-		Links:     m.Links,
+		ID:         m.ID,
+		Title:      m.Title,
+		Domain:     m.Domain,
+		Tags:       m.Tags,
+		Project:    m.Project,
+		Created:    m.Created,
+		Updated:    m.Updated,
+		Importance: m.Importance,
+		Lifecycle:  string(m.Lifecycle),
+		Source:     m.Source,
+		Links:      m.Links,
 	}
 	if !m.ExpiresOn.IsZero() {
 		d := m.ExpiresOn
@@ -190,6 +197,9 @@ func (m Memory) Validate() error {
 	}
 	if strings.TrimSpace(m.Body) == "" {
 		return fmt.Errorf("%w: body is required", ErrValidation)
+	}
+	if m.Importance < 1 || m.Importance > 5 {
+		return fmt.Errorf("%w: importance must be between 1 and 5, got %d", ErrValidation, m.Importance)
 	}
 	switch m.Lifecycle {
 	case Evergreen:

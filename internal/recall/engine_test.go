@@ -44,13 +44,14 @@ func sampleEngineMemory(t *testing.T) memory.Memory {
 		t.Fatalf("ParseDate: %v", err)
 	}
 	return memory.Memory{
-		ID:        memory.NewID(),
-		Title:     "Original",
-		Domain:    "tools",
-		Created:   d,
-		Updated:   d,
-		Lifecycle: memory.Evergreen,
-		Body:      "original body",
+		ID:         memory.NewID(),
+		Title:      "Original",
+		Domain:     "tools",
+		Created:    d,
+		Updated:    d,
+		Importance: 3,
+		Lifecycle:  memory.Evergreen,
+		Body:       "original body",
 	}
 }
 
@@ -128,6 +129,52 @@ func TestAddGetSearch(t *testing.T) {
 	}
 	if len(hits) != 1 || hits[0].ID != m.ID {
 		t.Errorf("Search = %+v", hits)
+	}
+}
+
+func TestAddImportance(t *testing.T) {
+	e := newEngine(t)
+	ctx := context.Background()
+
+	defaulted, _, err := e.Add(ctx, AddParams{Title: "Default rank", Body: "body", Domain: "tools"})
+	if err != nil {
+		t.Fatalf("Add default importance: %v", err)
+	}
+	if defaulted.Importance != 3 {
+		t.Fatalf("default importance = %d, want 3", defaulted.Importance)
+	}
+
+	critical, _, err := e.Add(ctx, AddParams{Title: "Critical rank", Body: "body", Domain: "tools", Importance: 5})
+	if err != nil {
+		t.Fatalf("Add explicit importance: %v", err)
+	}
+	if critical.Importance != 5 {
+		t.Fatalf("explicit importance = %d, want 5", critical.Importance)
+	}
+	got, _, err := e.Get(ctx, critical.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.Importance != 5 {
+		t.Fatalf("stored importance = %d, want 5", got.Importance)
+	}
+}
+
+func TestUpdateImportance(t *testing.T) {
+	e := newEngine(t)
+	ctx := context.Background()
+	m, _, err := e.Add(ctx, AddParams{Title: "Ranked", Body: "old", Domain: "tools"})
+	if err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	importance := 4
+	updated, _, err := e.Update(ctx, m.ID, UpdateParams{Importance: &importance})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if updated.Importance != 4 {
+		t.Fatalf("updated importance = %d, want 4", updated.Importance)
 	}
 }
 

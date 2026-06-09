@@ -73,7 +73,7 @@ func (q *Queries) GetLinksForMemory(ctx context.Context, memoryID string) ([]str
 }
 
 const getMemory = `-- name: GetMemory :one
-SELECT id, path, title, domain, project, source, lifecycle, expires_on, created, updated, body FROM memories WHERE id = ?
+SELECT id, path, title, domain, project, source, lifecycle, expires_on, created, updated, importance, body FROM memories WHERE id = ?
 `
 
 func (q *Queries) GetMemory(ctx context.Context, id string) (Memory, error) {
@@ -90,6 +90,7 @@ func (q *Queries) GetMemory(ctx context.Context, id string) (Memory, error) {
 		&i.ExpiresOn,
 		&i.Created,
 		&i.Updated,
+		&i.Importance,
 		&i.Body,
 	)
 	return i, err
@@ -195,8 +196,8 @@ func (q *Queries) ListMemoryIDs(ctx context.Context) ([]string, error) {
 const upsertMemory = `-- name: UpsertMemory :exec
 
 INSERT INTO memories (
-    id, path, title, domain, project, source, lifecycle, expires_on, created, updated, body
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    id, path, title, domain, project, source, lifecycle, expires_on, created, updated, importance, body
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     path       = excluded.path,
     title      = excluded.title,
@@ -207,21 +208,23 @@ ON CONFLICT(id) DO UPDATE SET
     expires_on = excluded.expires_on,
     created    = excluded.created,
     updated    = excluded.updated,
+    importance = excluded.importance,
     body       = excluded.body
 `
 
 type UpsertMemoryParams struct {
-	ID        string
-	Path      string
-	Title     string
-	Domain    string
-	Project   string
-	Source    string
-	Lifecycle string
-	ExpiresOn string
-	Created   string
-	Updated   string
-	Body      string
+	ID         string
+	Path       string
+	Title      string
+	Domain     string
+	Project    string
+	Source     string
+	Lifecycle  string
+	ExpiresOn  string
+	Created    string
+	Updated    string
+	Importance int64
+	Body       string
 }
 
 // query.sql holds static, type-safe queries sqlc generates Go for.
@@ -239,6 +242,7 @@ func (q *Queries) UpsertMemory(ctx context.Context, arg UpsertMemoryParams) erro
 		arg.ExpiresOn,
 		arg.Created,
 		arg.Updated,
+		arg.Importance,
 		arg.Body,
 	)
 	return err

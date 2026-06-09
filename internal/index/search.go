@@ -24,6 +24,9 @@ const MaxLimit = 200
 // being removed. The agent still decides final relevance.
 const recencyPenalty = 0.01
 
+// importanceBoost lifts high-importance memories in the lower-is-better score.
+const importanceBoost = 0.25
+
 // Filter describes a search. All fields are optional and combine with AND.
 type Filter struct {
 	Query          string   // full-text query over title+body; empty = browse by filters
@@ -40,12 +43,13 @@ type Filter struct {
 // Hit is a lightweight search result. Callers fetch full content separately by
 // reading the memory file at Path.
 type Hit struct {
-	ID      string
-	Title   string
-	Snippet string
-	Path    string
-	Domain  string
-	Score   float64 // lower is better
+	ID         string  `json:"id"`
+	Title      string  `json:"title"`
+	Snippet    string  `json:"snippet"`
+	Path       string  `json:"path"`
+	Domain     string  `json:"domain"`
+	Importance int     `json:"importance"`
+	Score      float64 `json:"score"` // lower is better
 }
 
 // Search runs a filtered, ranked query. With a Query it uses FTS5 (ranked by
@@ -74,7 +78,7 @@ func (ix *Index) Search(ctx context.Context, f Filter) ([]Hit, error) {
 		if matchQuery == "" {
 			fts = false
 		} else {
-			b.WriteString(`SELECT m.id, m.title, m.path, m.domain,
+			b.WriteString(`SELECT m.id, m.title, m.path, m.domain, m.importance,
        snippet(memories_fts, 2, '[', ']', ' … ', 12) AS snippet,
        bm25(memories_fts) AS rank
 FROM memories_fts f JOIN memories m ON m.id = f.id
@@ -83,7 +87,7 @@ WHERE memories_fts MATCH ?`)
 		}
 	}
 	if !fts {
-		b.WriteString(`SELECT m.id, m.title, m.path, m.domain,
+		b.WriteString(`SELECT m.id, m.title, m.path, m.domain, m.importance,
        substr(m.body, 1, 160) AS snippet,
        0.0 AS rank
 FROM memories m
@@ -123,10 +127,10 @@ WHERE 1 = 1`)
 	}
 
 	if fts {
-		b.WriteString(" ORDER BY bm25(memories_fts) + (julianday('now') - julianday(m.updated)) * ? ASC")
-		args = append(args, recencyPenalty)
+		b.WriteString(" ORDER BY bm25(memories_fts) + (julianday('now') - julianday(m.updated)) * ? - ((m.importance - 3) * ?) ASC")
+		args = append(args, recencyPenalty, importanceBoost)
 	} else {
-		b.WriteString(" ORDER BY m.updated DESC")
+		b.WriteString(" ORDER BY m.importance DESC, m.updated DESC")
 	}
 	b.WriteString(" LIMIT ?")
 	args = append(args, limit)
@@ -140,7 +144,7 @@ WHERE 1 = 1`)
 	var hits []Hit
 	for rows.Next() {
 		var h Hit
-		if err := rows.Scan(&h.ID, &h.Title, &h.Path, &h.Domain, &h.Snippet, &h.Score); err != nil {
+		if err := rows.Scan(&h.ID, &h.Title, &h.Path, &h.Domain, &h.Importance, &h.Snippet, &h.Score); err != nil {
 			return nil, fmt.Errorf("index: scan hit: %w", err)
 		}
 		h.Snippet = strings.TrimSpace(h.Snippet)

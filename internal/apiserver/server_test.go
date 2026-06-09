@@ -104,7 +104,7 @@ func TestCORSAllowlistForViteOrigins(t *testing.T) {
 func TestMemoryCRUDHappyPath(t *testing.T) {
 	_, app := newTestApp(t)
 
-	create := doReq(t, app, http.MethodPost, "/api/memories", `{"title":"API memory","body":"api body","domain":"tools","tags":["api"]}`)
+	create := doReq(t, app, http.MethodPost, "/api/memories", `{"title":"API memory","body":"api body","domain":"tools","tags":["api"],"importance":5}`)
 	if create.StatusCode != http.StatusCreated {
 		t.Fatalf("create status = %d, want 201", create.StatusCode)
 	}
@@ -122,7 +122,7 @@ func TestMemoryCRUDHappyPath(t *testing.T) {
 	}
 	var got memoryJSON
 	decodeJSON(t, get, &got)
-	if got.Title != "API memory" || got.Body == "" || got.Path == "" {
+	if got.Title != "API memory" || got.Body == "" || got.Path == "" || got.Importance != 5 {
 		t.Fatalf("get body = %+v", got)
 	}
 
@@ -134,13 +134,18 @@ func TestMemoryCRUDHappyPath(t *testing.T) {
 		Memories []hitJSON `json:"memories"`
 	}
 	decodeJSON(t, list, &listed)
-	if len(listed.Memories) != 1 || listed.Memories[0].ID != created.ID {
+	if len(listed.Memories) != 1 || listed.Memories[0].ID != created.ID || listed.Memories[0].Importance != 5 {
 		t.Fatalf("list = %+v", listed)
 	}
 
-	update := doReq(t, app, http.MethodPut, "/api/memories/"+created.ID, `{"body":"updated widgets"}`)
+	update := doReq(t, app, http.MethodPut, "/api/memories/"+created.ID, `{"body":"updated widgets","importance":4}`)
 	if update.StatusCode != http.StatusOK {
 		t.Fatalf("update status = %d, want 200", update.StatusCode)
+	}
+	var updated memoryJSON
+	decodeJSON(t, update, &updated)
+	if updated.Importance != 4 {
+		t.Fatalf("updated importance = %d, want 4", updated.Importance)
 	}
 
 	deleteResp := doReq(t, app, http.MethodDelete, "/api/memories/"+created.ID, "")

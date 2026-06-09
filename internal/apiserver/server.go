@@ -60,28 +60,30 @@ type domainJSON struct {
 }
 
 type hitJSON struct {
-	ID      string  `json:"id"`
-	Title   string  `json:"title"`
-	Domain  string  `json:"domain"`
-	Snippet string  `json:"snippet"`
-	Path    string  `json:"path"`
-	Score   float64 `json:"score"`
+	ID         string  `json:"id"`
+	Title      string  `json:"title"`
+	Domain     string  `json:"domain"`
+	Snippet    string  `json:"snippet"`
+	Path       string  `json:"path"`
+	Importance int     `json:"importance"`
+	Score      float64 `json:"score"`
 }
 
 type memoryJSON struct {
-	ID        string   `json:"id"`
-	Title     string   `json:"title"`
-	Domain    string   `json:"domain"`
-	Tags      []string `json:"tags"`
-	Project   string   `json:"project"`
-	Lifecycle string   `json:"lifecycle"`
-	ExpiresOn string   `json:"expires_on"`
-	Created   string   `json:"created"`
-	Updated   string   `json:"updated"`
-	Source    string   `json:"source"`
-	Links     []string `json:"links"`
-	Path      string   `json:"path"`
-	Body      string   `json:"body"`
+	ID         string   `json:"id"`
+	Title      string   `json:"title"`
+	Domain     string   `json:"domain"`
+	Tags       []string `json:"tags"`
+	Project    string   `json:"project"`
+	Lifecycle  string   `json:"lifecycle"`
+	ExpiresOn  string   `json:"expires_on"`
+	Created    string   `json:"created"`
+	Updated    string   `json:"updated"`
+	Source     string   `json:"source"`
+	Links      []string `json:"links"`
+	Importance int      `json:"importance"`
+	Path       string   `json:"path"`
+	Body       string   `json:"body"`
 }
 
 // ---- handlers ----
@@ -144,7 +146,7 @@ func (s *server) listMemories(c *fiber.Ctx) error {
 	}
 	out := make([]hitJSON, len(hits))
 	for i, h := range hits {
-		out[i] = hitJSON{ID: h.ID, Title: h.Title, Domain: h.Domain, Snippet: h.Snippet, Path: h.Path, Score: h.Score}
+		out[i] = hitJSON{ID: h.ID, Title: h.Title, Domain: h.Domain, Snippet: h.Snippet, Path: h.Path, Importance: h.Importance, Score: h.Score}
 	}
 	return c.JSON(fiber.Map{"memories": out})
 }
@@ -162,15 +164,16 @@ func (s *server) getMemory(c *fiber.Ctx) error {
 
 func (s *server) createMemory(c *fiber.Ctx) error {
 	var body struct {
-		Title     string   `json:"title"`
-		Body      string   `json:"body"`
-		Domain    string   `json:"domain"`
-		Tags      []string `json:"tags"`
-		Project   string   `json:"project"`
-		Lifecycle string   `json:"lifecycle"`
-		ExpiresOn string   `json:"expires_on"`
-		Source    string   `json:"source"`
-		Links     []string `json:"links"`
+		Title      string   `json:"title"`
+		Body       string   `json:"body"`
+		Domain     string   `json:"domain"`
+		Tags       []string `json:"tags"`
+		Project    string   `json:"project"`
+		Lifecycle  string   `json:"lifecycle"`
+		ExpiresOn  string   `json:"expires_on"`
+		Source     string   `json:"source"`
+		Links      []string `json:"links"`
+		Importance int      `json:"importance"`
 	}
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
@@ -178,7 +181,7 @@ func (s *server) createMemory(c *fiber.Ctx) error {
 	m, relPath, err := s.engine.Add(c.Context(), recall.AddParams{
 		Title: body.Title, Body: body.Body, Domain: body.Domain,
 		Tags: body.Tags, Project: body.Project, Lifecycle: body.Lifecycle,
-		ExpiresOn: body.ExpiresOn, Source: body.Source, Links: body.Links,
+		ExpiresOn: body.ExpiresOn, Source: body.Source, Links: body.Links, Importance: body.Importance,
 	})
 	if err != nil {
 		return validationOrErrResp(c, err)
@@ -189,21 +192,22 @@ func (s *server) createMemory(c *fiber.Ctx) error {
 func (s *server) updateMemory(c *fiber.Ctx) error {
 	// Pointer fields: absent JSON key → nil → no change. Present key → non-nil → applied.
 	var body struct {
-		Title     *string   `json:"title"`
-		Body      *string   `json:"body"`
-		Tags      *[]string `json:"tags"`
-		Project   *string   `json:"project"`
-		Lifecycle *string   `json:"lifecycle"`
-		ExpiresOn *string   `json:"expires_on"`
-		Source    *string   `json:"source"`
-		Links     *[]string `json:"links"`
+		Title      *string   `json:"title"`
+		Body       *string   `json:"body"`
+		Tags       *[]string `json:"tags"`
+		Project    *string   `json:"project"`
+		Lifecycle  *string   `json:"lifecycle"`
+		ExpiresOn  *string   `json:"expires_on"`
+		Source     *string   `json:"source"`
+		Links      *[]string `json:"links"`
+		Importance *int      `json:"importance"`
 	}
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 	m, relPath, err := s.engine.Update(c.Context(), c.Params("id"), recall.UpdateParams{
 		Title: body.Title, Body: body.Body, Tags: body.Tags, Project: body.Project,
-		Lifecycle: body.Lifecycle, ExpiresOn: body.ExpiresOn, Source: body.Source, Links: body.Links,
+		Lifecycle: body.Lifecycle, ExpiresOn: body.ExpiresOn, Source: body.Source, Links: body.Links, Importance: body.Importance,
 	})
 	if errors.Is(err, recall.ErrNotFound) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
@@ -248,7 +252,7 @@ func toMemoryJSON(m memory.Memory, relPath string) memoryJSON {
 		ID: m.ID, Title: m.Title, Domain: m.Domain, Tags: tags, Project: m.Project,
 		Lifecycle: string(m.Lifecycle), ExpiresOn: m.ExpiresOn.String(),
 		Created: m.Created.String(), Updated: m.Updated.String(),
-		Source: m.Source, Links: links, Path: relPath, Body: m.Body,
+		Source: m.Source, Links: links, Importance: m.Importance, Path: relPath, Body: m.Body,
 	}
 }
 
