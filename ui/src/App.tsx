@@ -1,14 +1,15 @@
-import { useState, useCallback } from 'react'
+import { lazy, Suspense, useState, useCallback } from 'react'
 import { Routes, Route, useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Layout } from '@/components/Layout'
 import { DomainSidebar } from '@/components/DomainSidebar'
 import { MemoryList } from '@/components/MemoryList'
-import { MemoryEditor } from '@/components/MemoryEditor'
 import { NewMemoryDialog } from '@/components/NewMemoryDialog'
 import { useDomains, useMemories, useMemory, useReindex, keys } from '@/queries'
 import { useDebounce } from '@/lib/useDebounce'
 import type { MemoryDetail, MemoryFilter } from '@/api/types'
+
+const MemoryEditor = lazy(() => import('@/components/MemoryEditor').then(module => ({ default: module.MemoryEditor })))
 
 function AppShell() {
   const { domain, id } = useParams<{ domain?: string; id?: string }>()
@@ -77,13 +78,15 @@ function AppShell() {
         }
         editor={
           selectedMemory ? (
-            <MemoryEditor
-              key={selectedMemory.id}
-              memory={selectedMemory}
-              onSaved={handleSaved}
-              onDeleted={handleDeleted}
-              onDirtyChange={setEditorDirty}
-            />
+            <Suspense fallback={<div className="flex items-center justify-center h-full text-white/30 text-sm">Loading editor…</div>}>
+              <MemoryEditor
+                key={selectedMemory.id}
+                memory={selectedMemory}
+                onSaved={handleSaved}
+                onDeleted={handleDeleted}
+                onDirtyChange={setEditorDirty}
+              />
+            </Suspense>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-white/20 text-sm gap-2">
               <span>Select a memory to edit</span>
