@@ -119,7 +119,7 @@ func (s *server) listMemories(c *fiber.Ctx) error {
 		Limit:          limit,
 	})
 	if err != nil {
-		return errResp(c, err)
+		return validationOrErrResp(c, err)
 	}
 	out := make([]hitJSON, len(hits))
 	for i, h := range hits {
@@ -261,6 +261,7 @@ func isSafeHost(host string) bool {
 	if err != nil {
 		h = host // no port present
 	}
+	h = strings.Trim(h, "[]")
 	switch h {
 	case "localhost", "127.0.0.1", "::1":
 		return true
