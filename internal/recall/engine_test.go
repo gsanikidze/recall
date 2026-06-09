@@ -299,6 +299,31 @@ func TestRebuildFromVault(t *testing.T) {
 	}
 }
 
+func TestReindexRejectsDuplicateMemoryIDs(t *testing.T) {
+	e := newEngine(t)
+	m1 := sampleEngineMemory(t)
+	m1.Title = "First duplicate"
+	m2 := m1
+	m2.Title = "Second duplicate"
+
+	firstPath := filepath.Join("tools", "first.md")
+	secondPath := filepath.Join("tools", "second.md")
+	if err := e.Vault().WriteAt(firstPath, m1); err != nil {
+		t.Fatalf("WriteAt first: %v", err)
+	}
+	if err := e.Vault().WriteAt(secondPath, m2); err != nil {
+		t.Fatalf("WriteAt second: %v", err)
+	}
+
+	_, err := e.Reindex(context.Background())
+	if err == nil {
+		t.Fatal("expected duplicate id error")
+	}
+	if !contains(err.Error(), m1.ID) || !contains(err.Error(), firstPath) || !contains(err.Error(), secondPath) {
+		t.Fatalf("duplicate error missing id or paths: %v", err)
+	}
+}
+
 func contains(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {

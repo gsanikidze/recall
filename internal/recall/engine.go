@@ -248,11 +248,16 @@ func (e *Engine) Reindex(ctx context.Context) (ReindexStats, error) {
 		return ReindexStats{}, err
 	}
 	present := make(map[string]struct{}, len(scanned))
+	pathsByID := make(map[string]string, len(scanned))
 	var stats ReindexStats
 	for _, sm := range scanned {
 		if err := sm.Memory.Validate(); err != nil {
 			return stats, fmt.Errorf("recall: invalid memory %s: %w", sm.RelPath, err)
 		}
+		if existingPath, ok := pathsByID[sm.Memory.ID]; ok {
+			return stats, fmt.Errorf("recall: duplicate memory id %s in %s and %s", sm.Memory.ID, existingPath, sm.RelPath)
+		}
+		pathsByID[sm.Memory.ID] = sm.RelPath
 		if err := e.index.Upsert(ctx, sm.RelPath, sm.Memory); err != nil {
 			return stats, err
 		}
