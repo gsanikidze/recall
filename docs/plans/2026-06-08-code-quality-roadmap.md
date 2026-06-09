@@ -754,9 +754,9 @@ npm --prefix ui run build
 
 ---
 
-## Phase 7 — Release, Generated Code, and Documentation
+## Phase 7 — Generated Code and Documentation
 
-**Objective:** Make Recall easier to build, release, and maintain over time.
+**Objective:** Make Recall easier to build and maintain over time. Release metadata/automation moved to Phase 8.
 
 ### Task 7.1 — Add generated-code freshness checks
 
@@ -766,11 +766,11 @@ npm --prefix ui run build
 - Possibly modify generated files under `internal/index/db/`
 
 **To-do:**
-- [ ] Add `generate` target for `sqlc generate`.
-- [ ] Add `generate-check` target: run generation then `git diff --exit-code internal/index/db`.
-- [ ] Pin/document sqlc version (`v1.30.0` observed in generated files).
-- [ ] Add CI step for generate check.
-- [ ] Run target locally.
+- [x] Add `generate` target for `sqlc generate`.
+- [x] Add `generate-check` target: run generation then `git diff --exit-code internal/index/db`.
+- [x] Pin/document sqlc version (`v1.30.0` observed in generated files).
+- [x] Add CI step for generate check.
+- [x] Run target locally.
 - [ ] Commit:
   ```bash
   git add Makefile .github/workflows/ci.yml internal/index/db
@@ -782,7 +782,65 @@ npm --prefix ui run build
 make generate-check
 ```
 
-### Task 7.2 — Add release metadata and automation
+### Task 7.2 — Add README and development docs
+
+**Files:**
+- Create: `README.md`
+- Create or modify docs under `docs/`
+
+**To-do:**
+- [x] Document what Recall does.
+- [x] Document install/build.
+- [x] Document `make build` vs `make build-nui`.
+- [x] Document `RECALL_HOME` and `RECALL_PROJECT`.
+- [x] Document CLI examples: init/add/search/get/delete/reindex/mcp/ui.
+- [x] Document MCP setup example.
+- [x] Document API/UI dev flow.
+- [x] Document test/check commands.
+- [x] Document local security model: unauthenticated loopback API, CORS allowlist, DNS-rebinding guard.
+- [ ] Commit:
+  ```bash
+  git add README.md docs
+  git commit -m "docs: add recall development guide"
+  ```
+
+**Verification:**
+```bash
+make check
+```
+
+### Task 7.3 — Review `ui/node_modules/go.mod` workaround
+
+**Files:**
+- Modify: `Makefile`
+- Modify docs if keeping workaround
+
+**To-do:**
+- [x] Determine why `@echo 'module nodemodules' > ui/node_modules/go.mod` is needed.
+- [x] Prefer cleaner layout if possible: embed built assets from Go-only directory.
+- [x] If keeping workaround, document exact reason in Makefile comment.
+- [x] Ensure `make clean` removes generated artifacts.
+- [x] Run build/test.
+- [ ] Commit:
+  ```bash
+  git add Makefile ui
+  git commit -m "chore: clarify ui build workaround"
+  ```
+
+**Verification:**
+```bash
+make clean
+make build
+make check
+```
+
+---
+
+## Phase 8 — Release Metadata and Automation
+
+**Objective:** Add version metadata and release packaging separately from Phase 7.
+
+### Task 8.1 — Add release metadata and automation
 
 **Files:**
 - Modify version definition file (`main.go` or relevant cmd file)
@@ -805,58 +863,6 @@ make generate-check
 ```bash
 make release-snapshot
 ./bin/recall version
-```
-
-### Task 7.3 — Add README and development docs
-
-**Files:**
-- Create: `README.md`
-- Create or modify docs under `docs/`
-
-**To-do:**
-- [ ] Document what Recall does.
-- [ ] Document install/build.
-- [ ] Document `make build` vs `make build-nui`.
-- [ ] Document `RECALL_HOME` and `RECALL_PROJECT`.
-- [ ] Document CLI examples: init/add/search/get/delete/reindex/mcp/ui.
-- [ ] Document MCP setup example.
-- [ ] Document API/UI dev flow.
-- [ ] Document test/check commands.
-- [ ] Document local security model: unauthenticated loopback API, CORS allowlist, DNS-rebinding guard.
-- [ ] Commit:
-  ```bash
-  git add README.md docs
-  git commit -m "docs: add recall development guide"
-  ```
-
-**Verification:**
-```bash
-make check
-```
-
-### Task 7.4 — Review `ui/node_modules/go.mod` workaround
-
-**Files:**
-- Modify: `Makefile`
-- Modify docs if keeping workaround
-
-**To-do:**
-- [ ] Determine why `@echo 'module nodemodules' > ui/node_modules/go.mod` is needed.
-- [ ] Prefer cleaner layout if possible: embed built assets from Go-only directory.
-- [ ] If keeping workaround, document exact reason in Makefile comment.
-- [ ] Ensure `make clean` removes generated artifacts.
-- [ ] Run build/test.
-- [ ] Commit:
-  ```bash
-  git add Makefile ui
-  git commit -m "chore: clarify ui build workaround"
-  ```
-
-**Verification:**
-```bash
-make clean
-make build
-make check
 ```
 
 ---
@@ -906,12 +912,14 @@ make check
 - [ ] Route/API path params encoded safely.
 
 ### Release/docs
-- [ ] Generated-code freshness check added.
+- [x] Generated-code freshness check added.
+- [x] README added.
+- [x] Dev/security docs added.
+- [x] `ui/node_modules/go.mod` workaround reviewed.
+
+### Release automation
 - [ ] Release metadata added.
 - [ ] Release automation added.
-- [ ] README added.
-- [ ] Dev/security docs added.
-- [ ] `ui/node_modules/go.mod` workaround reviewed.
 
 ---
 
@@ -923,7 +931,8 @@ make check
 4. [ ] Phase 4: API/MCP tests and errors.
 5. [ ] Phase 5: UI tests/types/bundle.
 6. [ ] Phase 6: UX completeness.
-7. [ ] Phase 7: release/docs/generated checks.
+7. [x] Phase 7: docs/generated checks.
+8. [ ] Phase 8: release metadata/automation.
 
 ---
 
@@ -947,8 +956,10 @@ go mod tidy && git diff --exit-code go.mod go.sum
 go vet ./...
 go test ./...
 go test -race ./...
+make generate-check
 npm --prefix ui ci
 npm --prefix ui run lint
+npm --prefix ui run test
 npm --prefix ui run build
 npm --prefix ui audit --audit-level=moderate
 git status --short

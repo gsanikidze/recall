@@ -40,17 +40,11 @@ jobs:
       - name: Go coverage
         run: make cover
 
-      - name: UI install
-        run: npm --prefix ui ci
+      - name: Generated sqlc freshness
+        run: make generate-check
 
-      - name: UI lint
-        run: make lint-ui
-
-      - name: UI build
-        run: make build-ui
-
-      - name: UI audit
-        run: make audit-ui
+      - name: UI checks
+        run: make lint-ui test-ui build-ui audit-ui
 
       - name: Build without UI
         run: make build-nui

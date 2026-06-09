@@ -1,8 +1,10 @@
-.PHONY: fmt fmt-check tidy tidy-check vet test race cover lint-ui build-ui audit-ui test-ui-tag ui build build-nui dev clean check
+.PHONY: fmt fmt-check tidy tidy-check vet test race cover generate generate-check install-ui lint-ui test-ui build-ui audit-ui test-ui-tag ui build build-nui dev clean check
 
 BIN_DIR := bin
 BIN := $(BIN_DIR)/recall
 GO_FILES := $(shell git ls-files '*.go')
+SQLC_VERSION := v1.30.0
+SQLC := go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION)
 
 fmt:
 	gofmt -w $(GO_FILES)
@@ -33,16 +35,29 @@ race:
 cover:
 	go test -cover ./...
 
-lint-ui:
-	npm --prefix ui run lint
+generate:
+	$(SQLC) generate
 
-build-ui:
+generate-check: generate
+	git diff --exit-code internal/index/db
+
+install-ui:
 	npm --prefix ui ci
-	npm --prefix ui run build
-	# Keep Go commands from traversing npm dependency trees as nested packages.
+	# Go treats every subdirectory under the module root as a package for ./... unless
+	# it finds a nested go.mod. npm packages can contain .go files, so this sentinel
+	# prevents `go test ./...` and friends from traversing ui/node_modules.
 	@echo 'module nodemodules' > ui/node_modules/go.mod
 
-audit-ui:
+lint-ui: install-ui
+	npm --prefix ui run lint
+
+test-ui: install-ui
+	npm --prefix ui run test
+
+build-ui: install-ui
+	npm --prefix ui run build
+
+audit-ui: install-ui
 	npm --prefix ui audit --audit-level=moderate
 
 test-ui-tag:
@@ -65,7 +80,7 @@ build-nui:
 dev:
 	go run . ui --no-browser
 
-check: fmt-check tidy-check vet test race cover lint-ui build-ui audit-ui build-nui build test-ui-tag
+check: fmt-check tidy-check vet test race cover generate-check lint-ui test-ui build-ui audit-ui build-nui build test-ui-tag
 
 clean:
 	rm -rf $(BIN_DIR)
