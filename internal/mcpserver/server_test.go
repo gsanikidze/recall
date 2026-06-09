@@ -3,8 +3,10 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
+	"recall/internal/index"
 	"recall/internal/recall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -60,6 +62,30 @@ func call(t *testing.T, s *mcp.ClientSession, name string, args map[string]any, 
 	}
 	if err := json.Unmarshal([]byte(text.Text), out); err != nil {
 		t.Fatalf("tool %s: decoding result %q: %v", name, text.Text, err)
+	}
+}
+
+func callExpectError(t *testing.T, s *mcp.ClientSession, name string, args map[string]any, want string) {
+	t.Helper()
+	res, err := s.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
+	if err != nil {
+		t.Fatalf("CallTool transport error: %v", err)
+	}
+	if !res.IsError {
+		t.Fatalf("expected tool error from %s", name)
+	}
+	if want == "" {
+		return
+	}
+	if len(res.Content) == 0 {
+		t.Fatalf("tool error missing content")
+	}
+	text, ok := res.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatalf("expected text error content, got %T", res.Content[0])
+	}
+	if !strings.Contains(text.Text, want) {
+		t.Fatalf("error %q missing %q", text.Text, want)
 	}
 }
 
@@ -136,14 +162,45 @@ func TestMCPAddSearchGetFlow(t *testing.T) {
 
 func TestMCPAddRejectsUnknownDomain(t *testing.T) {
 	s := startTestServer(t)
-	res, err := s.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "recall_add",
-		Arguments: map[string]any{"title": "x", "body": "y", "domain": "nonexistent"},
-	})
-	if err != nil {
-		t.Fatalf("CallTool transport error: %v", err)
+	callExpectError(t, s, "recall_add", map[string]any{"title": "x", "body": "y", "domain": "nonexistent"}, "unknown domain")
+}
+
+func TestMCPSearchRespectsLimitCap(t *testing.T) {
+	s := startTestServer(t)
+	for i := 0; i < index.MaxLimit+5; i++ {
+		call(t, s, "recall_add", map[string]any{
+			"title":  "Limit memory",
+			"body":   "same searchable body",
+			"domain": "tools",
+		}, nil)
 	}
-	if !res.IsError {
-		t.Error("expected tool error for unknown domain")
+	var search searchOut
+	call(t, s, "recall_search", map[string]any{"limit": index.MaxLimit + 500}, &search)
+	if len(search.Hits) != index.MaxLimit {
+		t.Fatalf("hits = %d, want %d", len(search.Hits), index.MaxLimit)
 	}
+}
+
+func TestMCPSearchRejectsInvalidFilters(t *testing.T) {
+	s := startTestServer(t)
+	cases := []struct {
+		name string
+		args map[string]any
+		want string
+	}{
+		{"invalid lifecycle", map[string]any{"lifecycle": "bad"}, "lifecycle"},
+		{"invalid since", map[string]any{"since": "bad-date"}, "since"},
+		{"invalid until", map[string]any{"until": "bad-date"}, "until"},
+		{"since after until", map[string]any{"since": "2026-06-09", "until": "2026-06-08"}, "since"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			callExpectError(t, s, "recall_search", tc.args, tc.want)
+		})
+	}
+}
+
+func TestMCPAddRejectsBlankBody(t *testing.T) {
+	s := startTestServer(t)
+	callExpectError(t, s, "recall_add", map[string]any{"title": "x", "body": " \n	 ", "domain": "tools"}, "body is required")
 }
