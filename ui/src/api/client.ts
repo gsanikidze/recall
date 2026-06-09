@@ -1,6 +1,6 @@
 import type {
   Domain, MemoryHit, MemoryDetail, MemoryFilter,
-  CreateMemoryParams, UpdateMemoryParams,
+  CreateDomainParams, CreateMemoryParams, UpdateMemoryParams,
 } from './types'
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -38,6 +38,10 @@ function initWithSignal(signal?: AbortSignal): RequestInit {
 export async function listDomains(signal?: AbortSignal): Promise<Domain[]> {
   const data = await request<{ domains: Domain[] }>('/api/domains', initWithSignal(signal))
   return data.domains
+}
+
+export async function createDomain(params: CreateDomainParams): Promise<Domain> {
+  return request<Domain>('/api/domains', { method: 'POST', body: JSON.stringify(params) })
 }
 
 export async function listMemories(filter: MemoryFilter = {}, signal?: AbortSignal): Promise<MemoryHit[]> {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  createDomain,
   createMemory,
   deleteMemory,
   getMemory,
@@ -70,6 +71,20 @@ describe('api client', () => {
     fetchMock.mockResolvedValue(jsonResponse({ domains: [] }))
     await listDomains()
     expect(requestHeaders(fetchMock).has('Content-Type')).toBe(false)
+  })
+
+  it('creates domains through the API', async () => {
+    const fetchMock = mockFetch(jsonResponse({ name: 'personal-notes', description: 'Private notes' }, { status: 201 }))
+
+    await expect(createDomain({ name: 'personal-notes', description: 'Private notes' })).resolves.toEqual({
+      name: 'personal-notes',
+      description: 'Private notes',
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/domains', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ name: 'personal-notes', description: 'Private notes' }),
+    }))
   })
 
   it('encodes path params', async () => {

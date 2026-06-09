@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query'
 import {
   listDomains,
+  createDomain,
   listMemories,
   getMemory,
   createMemory,
@@ -13,7 +14,7 @@ import {
   deleteMemory,
   reindex,
 } from '@/api/client'
-import type { MemoryFilter, CreateMemoryParams, UpdateMemoryParams } from '@/api/types'
+import type { MemoryFilter, CreateDomainParams, CreateMemoryParams, UpdateMemoryParams } from '@/api/types'
 
 export const keys = {
   domains: () => ['domains'] as const,
@@ -25,6 +26,14 @@ export function useDomains() {
   return useQuery({
     queryKey: keys.domains(),
     queryFn: ({ signal }) => listDomains(signal),
+  })
+}
+
+export function useCreateDomain() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (params: CreateDomainParams) => createDomain(params),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.domains() }),
   })
 }
 

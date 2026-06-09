@@ -5,13 +5,21 @@
 package vault
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 )
+
+// ErrInvalidDomain is returned when a domain name is not a safe vault folder.
+var ErrInvalidDomain = errors.New("invalid domain")
+
+// ErrDomainExists is returned when creating a domain that already exists.
+var ErrDomainExists = errors.New("domain already exists")
 
 // readmeName is the per-domain (and root) description/index file.
 const readmeName = "README.md"
@@ -39,6 +47,7 @@ var domainNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 // Vault is a handle to a vault directory.
 type Vault struct {
 	root string
+	mu   sync.Mutex
 }
 
 // Open returns a Vault rooted at the given directory. It does not create it.
@@ -71,9 +80,19 @@ func (v *Vault) Scaffold() error {
 
 // AddDomain creates a new domain folder + README and refreshes the root index.
 func (v *Vault) AddDomain(name, description string) error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
 	name = strings.ToLower(strings.TrimSpace(name))
 	if !domainNamePattern.MatchString(name) {
-		return fmt.Errorf("vault: invalid domain name %q (use lowercase letters, digits, dashes)", name)
+		return fmt.Errorf("%w: vault domain name %q (use lowercase letters, digits, dashes)", ErrInvalidDomain, name)
+	}
+	if info, err := os.Lstat(v.DomainPath(name)); err == nil && info.IsDir() {
+		return fmt.Errorf("%w: %q", ErrDomainExists, name)
+	} else if err == nil {
+		return fmt.Errorf("vault: domain path %q exists but is not a directory", name)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("vault: checking domain %q: %w", name, err)
 	}
 	if description == "" {
 		description = "(no description)"

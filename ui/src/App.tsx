@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Layout } from '@/components/Layout'
 import { DomainSidebar } from '@/components/DomainSidebar'
 import { MemoryList } from '@/components/MemoryList'
+import { NewDomainDialog } from '@/components/NewDomainDialog'
 import { NewMemoryDialog } from '@/components/NewMemoryDialog'
 import { useDomains, useMemories, useMemory, useReindex, keys } from '@/queries'
 import { useDebounce } from '@/lib/useDebounce'
@@ -17,6 +18,7 @@ function AppShell() {
   const qc = useQueryClient()
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [showNewDomain, setShowNewDomain] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [editorDirty, setEditorDirty] = useState(false)
 
@@ -52,6 +54,12 @@ function AppShell() {
     navigate(domain ? `/domains/${domain}/${newId}` : `/${newId}`)
   }, [navigate, domain])
 
+  const handleDomainCreated = useCallback((name: string) => {
+    setShowNewDomain(false)
+    qc.invalidateQueries({ queryKey: keys.domains() })
+    guardedNavigate(`/domains/${name}`)
+  }, [guardedNavigate, qc])
+
   return (
     <>
       <Layout
@@ -61,7 +69,7 @@ function AppShell() {
             selected={domain ?? null}
             onSelect={d => guardedNavigate(d ? `/domains/${d}` : '/')}
             onReindex={() => reindexMutation.mutate(undefined)}
-            onAddDomain={() => qc.invalidateQueries({ queryKey: keys.domains() })}
+            onAddDomain={() => setShowNewDomain(true)}
             reindexing={reindexMutation.isPending}
           />
         }
@@ -101,6 +109,13 @@ function AppShell() {
           domains={domains}
           onCreated={handleCreated}
           onClose={() => setShowNew(false)}
+        />
+      )}
+
+      {showNewDomain && (
+        <NewDomainDialog
+          onCreated={handleDomainCreated}
+          onClose={() => setShowNewDomain(false)}
         />
       )}
     </>

@@ -13,6 +13,7 @@ import (
 	"recall/internal/index"
 	"recall/internal/memory"
 	"recall/internal/recall"
+	"recall/internal/vault"
 )
 
 // allowedOrigins is the strict CORS allowlist (Vite dev server only).
@@ -38,6 +39,7 @@ func New(e *recall.Engine) *fiber.App {
 	)
 
 	api.Get("/domains", s.listDomains)
+	api.Post("/domains", s.createDomain)
 	api.Get("/memories", s.listMemories)
 	api.Get("/memories/:id", s.getMemory)
 	api.Post("/memories", s.createMemory)
@@ -94,6 +96,25 @@ func (s *server) listDomains(c *fiber.Ctx) error {
 		out[i] = domainJSON{Name: d.Name, Description: d.Description}
 	}
 	return c.JSON(fiber.Map{"domains": out})
+}
+
+func (s *server) createDomain(c *fiber.Ctx) error {
+	var body struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	name := strings.ToLower(strings.TrimSpace(body.Name))
+	description := strings.TrimSpace(body.Description)
+	if err := s.engine.Vault().AddDomain(name, description); err != nil {
+		return validationOrErrResp(c, err)
+	}
+	if description == "" {
+		description = "(no description)"
+	}
+	return c.Status(fiber.StatusCreated).JSON(domainJSON{Name: name, Description: description})
 }
 
 func (s *server) listMemories(c *fiber.Ctx) error {
@@ -237,7 +258,10 @@ func errResp(c *fiber.Ctx, err error) error {
 
 func validationOrErrResp(c *fiber.Ctx, err error) error {
 	status := fiber.StatusInternalServerError
-	if errors.Is(err, recall.ErrValidation) || errors.Is(err, memory.ErrValidation) || errors.Is(err, index.ErrInvalidFilter) {
+	if errors.Is(err, vault.ErrDomainExists) {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+	}
+	if errors.Is(err, recall.ErrValidation) || errors.Is(err, memory.ErrValidation) || errors.Is(err, index.ErrInvalidFilter) || errors.Is(err, vault.ErrInvalidDomain) {
 		status = fiber.StatusUnprocessableEntity
 	}
 	return c.Status(status).JSON(fiber.Map{"error": err.Error()})

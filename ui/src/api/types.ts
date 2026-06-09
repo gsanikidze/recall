@@ -3,6 +3,11 @@ export interface Domain {
   description: string
 }
 
+export interface CreateDomainParams {
+  name: string
+  description?: string
+}
+
 export interface MemoryHit {
   id: string
   title: string

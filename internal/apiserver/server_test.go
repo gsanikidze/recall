@@ -157,6 +157,58 @@ func TestInvalidJSONReturns400(t *testing.T) {
 	}
 }
 
+func TestCreateDomainEndpointAddsDomain(t *testing.T) {
+	_, app := newTestApp(t)
+
+	create := doReq(t, app, http.MethodPost, "/api/domains", `{"name":"personal-notes","description":"Private notes"}`)
+	if create.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(create.Body)
+		t.Fatalf("create status = %d, want 201 body=%s", create.StatusCode, body)
+	}
+	var created domainJSON
+	decodeJSON(t, create, &created)
+	if created.Name != "personal-notes" || created.Description != "Private notes" {
+		t.Fatalf("created = %+v", created)
+	}
+
+	list := doReq(t, app, http.MethodGet, "/api/domains", "")
+	var listed struct {
+		Domains []domainJSON `json:"domains"`
+	}
+	decodeJSON(t, list, &listed)
+	found := false
+	for _, d := range listed.Domains {
+		if d.Name == "personal-notes" && d.Description == "Private notes" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("created domain not listed: %+v", listed.Domains)
+	}
+}
+
+func TestCreateDomainValidationReturns422(t *testing.T) {
+	_, app := newTestApp(t)
+	resp := doReq(t, app, http.MethodPost, "/api/domains", `{"name":"Bad Name"}`)
+	if resp.StatusCode != http.StatusUnprocessableEntity {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 422 body=%s", resp.StatusCode, body)
+	}
+}
+
+func TestCreateDomainDuplicateReturns409(t *testing.T) {
+	_, app := newTestApp(t)
+	first := doReq(t, app, http.MethodPost, "/api/domains", `{"name":"personal-notes","description":"First"}`)
+	if first.StatusCode != http.StatusCreated {
+		t.Fatalf("first status = %d, want 201", first.StatusCode)
+	}
+	duplicate := doReq(t, app, http.MethodPost, "/api/domains", `{"name":"personal-notes","description":"Second"}`)
+	if duplicate.StatusCode != http.StatusConflict {
+		body, _ := io.ReadAll(duplicate.Body)
+		t.Fatalf("duplicate status = %d, want 409 body=%s", duplicate.StatusCode, body)
+	}
+}
+
 func TestUnknownDomainReturns422(t *testing.T) {
 	_, app := newTestApp(t)
 	resp := doReq(t, app, http.MethodPost, "/api/memories", `{"title":"x","body":"y","domain":"nope"}`)
