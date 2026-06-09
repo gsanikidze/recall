@@ -8,12 +8,15 @@ import { NewDomainDialog } from '@/components/NewDomainDialog'
 import { NewMemoryDialog } from '@/components/NewMemoryDialog'
 import { useDomains, useMemories, useMemory, useReindex, keys } from '@/queries'
 import { useDebounce } from '@/lib/useDebounce'
+import { domainRoute, memoryRoute, routeParam } from '@/lib/routes'
 import type { MemoryDetail, MemoryFilter } from '@/api/types'
 
 const MemoryEditor = lazy(() => import('@/components/MemoryEditor').then(module => ({ default: module.MemoryEditor })))
 
 function AppShell() {
-  const { domain, id } = useParams<{ domain?: string; id?: string }>()
+  const params = useParams<{ domain?: string; id?: string }>()
+  const domain = routeParam(params.domain)
+  const id = routeParam(params.id)
   const navigate = useNavigate()
   const qc = useQueryClient()
 
@@ -40,24 +43,24 @@ function AppShell() {
 
   const handleSaved = useCallback((updated: MemoryDetail) => {
     setEditorDirty(false)
-    navigate(domain ? `/domains/${domain}/${updated.id}` : `/${updated.id}`, { replace: true })
+    navigate(memoryRoute(domain ?? null, updated.id), { replace: true })
   }, [navigate, domain])
 
   const handleDeleted = useCallback(() => {
     setEditorDirty(false)
-    navigate(domain ? `/domains/${domain}` : '/')
+    navigate(domainRoute(domain ?? null))
   }, [navigate, domain])
 
   const handleCreated = useCallback((newId: string) => {
     setShowNew(false)
     setEditorDirty(false)
-    navigate(domain ? `/domains/${domain}/${newId}` : `/${newId}`)
+    navigate(memoryRoute(domain ?? null, newId))
   }, [navigate, domain])
 
   const handleDomainCreated = useCallback((name: string) => {
     setShowNewDomain(false)
     qc.invalidateQueries({ queryKey: keys.domains() })
-    guardedNavigate(`/domains/${name}`)
+    guardedNavigate(domainRoute(name))
   }, [guardedNavigate, qc])
 
   return (
@@ -67,7 +70,7 @@ function AppShell() {
           <DomainSidebar
             domains={domains}
             selected={domain ?? null}
-            onSelect={d => guardedNavigate(d ? `/domains/${d}` : '/')}
+            onSelect={d => guardedNavigate(domainRoute(d))}
             onReindex={() => reindexMutation.mutate(undefined)}
             onAddDomain={() => setShowNewDomain(true)}
             reindexing={reindexMutation.isPending}
@@ -80,7 +83,7 @@ function AppShell() {
             selectedId={id ?? null}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onSelect={memId => guardedNavigate(domain ? `/domains/${domain}/${memId}` : `/${memId}`)}
+            onSelect={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
             onNew={() => setShowNew(true)}
           />
         }
