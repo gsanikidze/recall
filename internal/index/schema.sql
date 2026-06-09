@@ -3,11 +3,11 @@
 -- creates memories_fts as an FTS5 virtual table. For sqlc, memories_fts is
 -- declared as a normal table with matching writable columns so static FTS
 -- maintenance queries can be generated. Dynamic FTS search remains hand-written
--- in search.go. Keep table/column definitions here in sync with migrations/0001_init.sql.
+-- in search.go. Keep table/column definitions here in sync with migrations/.
 
 CREATE TABLE memories (
     id          TEXT PRIMARY KEY,
-    path        TEXT NOT NULL,
+    path        TEXT NOT NULL UNIQUE,
     title       TEXT NOT NULL,
     domain      TEXT NOT NULL,
     project     TEXT NOT NULL DEFAULT '',
@@ -20,13 +20,15 @@ CREATE TABLE memories (
 );
 
 CREATE TABLE tags (
-    memory_id TEXT NOT NULL,
-    tag       TEXT NOT NULL
+    memory_id TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    tag       TEXT NOT NULL,
+    UNIQUE(memory_id, tag)
 );
 
 CREATE TABLE links (
-    memory_id TEXT NOT NULL,
-    target_id TEXT NOT NULL
+    memory_id TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    target_id TEXT NOT NULL,
+    UNIQUE(memory_id, target_id)
 );
 
 CREATE TABLE memories_fts (

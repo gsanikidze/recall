@@ -303,6 +303,34 @@ func TestConcurrentUpserts(t *testing.T) {
 	}
 }
 
+func TestSchemaEnforcesConstraints(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+	first := mem(t, "01UNIQ1", "First", "tools", "body")
+	second := mem(t, "01UNIQ2", "Second", "tools", "body")
+	if err := ix.Upsert(ctx, "tools/same.md", first); err != nil {
+		t.Fatalf("Upsert first: %v", err)
+	}
+	if err := ix.Upsert(ctx, "tools/same.md", second); err == nil {
+		t.Fatal("expected duplicate path to fail")
+	}
+	if _, err := ix.sql.ExecContext(ctx, "INSERT INTO tags (memory_id, tag) VALUES (?, ?)", "missing", "tag"); err == nil {
+		t.Fatal("expected foreign key failure for unknown tag memory")
+	}
+	if _, err := ix.sql.ExecContext(ctx, "INSERT INTO tags (memory_id, tag) VALUES (?, ?)", first.ID, "dup"); err != nil {
+		t.Fatalf("insert first tag: %v", err)
+	}
+	if _, err := ix.sql.ExecContext(ctx, "INSERT INTO tags (memory_id, tag) VALUES (?, ?)", first.ID, "dup"); err == nil {
+		t.Fatal("expected duplicate tag to fail")
+	}
+	if _, err := ix.sql.ExecContext(ctx, "INSERT INTO links (memory_id, target_id) VALUES (?, ?)", first.ID, "target"); err != nil {
+		t.Fatalf("insert first link: %v", err)
+	}
+	if _, err := ix.sql.ExecContext(ctx, "INSERT INTO links (memory_id, target_id) VALUES (?, ?)", first.ID, "target"); err == nil {
+		t.Fatal("expected duplicate link to fail")
+	}
+}
+
 func TestStripMarkdown(t *testing.T) {
 	in := "# Heading\n\nUse `kamal` and [the docs](http://x). **Bold** and [[wiki]].\n\n- item one\n- item two"
 	got := StripMarkdown(in)
