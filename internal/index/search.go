@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"recall/internal/memory"
 )
 
 // defaultLimit caps result count when a caller does not specify one.
@@ -46,6 +48,9 @@ type Hit struct {
 // relevance blended with recency); without one it browses by filters, newest
 // first.
 func (ix *Index) Search(ctx context.Context, f Filter) ([]Hit, error) {
+	if err := validateFilter(f); err != nil {
+		return nil, err
+	}
 	limit := f.Limit
 	if limit <= 0 {
 		limit = defaultLimit
@@ -141,6 +146,26 @@ WHERE 1 = 1`)
 		return nil, fmt.Errorf("index: search rows: %w", err)
 	}
 	return hits, nil
+}
+
+func validateFilter(f Filter) error {
+	if f.Lifecycle != "" && f.Lifecycle != string(memory.Evergreen) && f.Lifecycle != string(memory.Expires) {
+		return fmt.Errorf("index: lifecycle must be 'evergreen' or 'expires', got %q", f.Lifecycle)
+	}
+	if f.Since != "" {
+		if _, err := memory.ParseDate(f.Since); err != nil {
+			return fmt.Errorf("index: invalid since date: %w", err)
+		}
+	}
+	if f.Until != "" {
+		if _, err := memory.ParseDate(f.Until); err != nil {
+			return fmt.Errorf("index: invalid until date: %w", err)
+		}
+	}
+	if f.Since != "" && f.Until != "" && f.Since > f.Until {
+		return fmt.Errorf("index: since must be before or equal to until")
+	}
+	return nil
 }
 
 // placeholders returns "?, ?, ..." with n entries.

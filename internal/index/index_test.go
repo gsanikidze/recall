@@ -143,6 +143,33 @@ func TestSearchFilters(t *testing.T) {
 	}
 }
 
+func TestSearchRejectsInvalidFilters(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	cases := []struct {
+		name    string
+		filter  Filter
+		wantErr string
+	}{
+		{"invalid lifecycle", Filter{Lifecycle: "temporary"}, "lifecycle"},
+		{"invalid since", Filter{Since: "2026/06/07"}, "since"},
+		{"invalid until", Filter{Until: "tomorrow"}, "until"},
+		{"since after until", Filter{Since: "2026-06-08", Until: "2026-06-07"}, "since must be before or equal to until"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ix.Search(ctx, tc.filter)
+			if err == nil {
+				t.Fatal("expected validation error")
+			}
+			if !contains(err.Error(), tc.wantErr) {
+				t.Fatalf("error %q missing %q", err.Error(), tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestExpiredHiddenByDefault(t *testing.T) {
 	ix := openIndex(t)
 	ctx := context.Background()
