@@ -98,6 +98,27 @@ export function MetadataPanel({ memory, onChange }: Props) {
               className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white/80 focus:outline-none focus:border-violet-500/50"
             />
           </div>
+          {/* Read-only relationships */}
+          <div className="col-span-2">
+            <div className="text-white/40 block mb-1">Relationships</div>
+            {memory.relationships.length === 0 ? (
+              <div className="text-white/25">No relationships</div>
+            ) : (
+              <div className="space-y-1">
+                {memory.relationships.map(rel => (
+                  <div
+                    key={`${rel.target_id}-${rel.type}`}
+                    className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/60"
+                  >
+                    <span className="font-mono text-violet-300">{rel.type}</span>
+                    <span className="mx-1 text-white/25">→</span>
+                    <span className="font-mono">{rel.target_id}</span>
+                    {rel.note && <span className="ml-2 text-white/40">{rel.note}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           {/* Read-only dates */}
           <div className="col-span-2 flex gap-4 text-white/30 mt-1">
             <span>Created: {memory.created}</span>

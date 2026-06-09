@@ -46,6 +46,18 @@ INSERT INTO links (memory_id, target_id) VALUES (?, ?);
 -- name: GetLinksForMemory :many
 SELECT target_id FROM links WHERE memory_id = ? ORDER BY target_id;
 
+-- name: DeleteRelationshipsForMemory :exec
+DELETE FROM memory_relationships WHERE source_id = ?;
+
+-- name: DeleteRelationshipsTouchingMemory :exec
+DELETE FROM memory_relationships WHERE source_id = ? OR target_id = ?;
+
+-- name: InsertRelationship :exec
+INSERT INTO memory_relationships (source_id, target_id, type, note) VALUES (?, ?, ?, ?);
+
+-- name: GetRelationshipsForMemory :many
+SELECT target_id, type, note FROM memory_relationships WHERE source_id = ? ORDER BY target_id, type;
+
 -- name: DeleteFTSForMemory :exec
 DELETE FROM memories_fts WHERE id = ?;
 

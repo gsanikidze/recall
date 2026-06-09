@@ -164,6 +164,117 @@ func TestValidateImportance(t *testing.T) {
 	}
 }
 
+func TestParseMemoryWithRelationships(t *testing.T) {
+	data := []byte(`---
+id: 01KTRELATIONSHIP000000000001
+title: Hermes Recall MCP config
+domain: tools
+project: recall
+created: "2026-06-09"
+updated: "2026-06-09"
+lifecycle: evergreen
+importance: 5
+relationships:
+  - target_id: 01KTPROJECT000000000000001
+    type: uses_tool
+    note: Hermes calls Recall over MCP
+---
+
+Recall MCP is configured.
+`)
+
+	got, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(got.Relationships) != 1 {
+		t.Fatalf("relationships len = %d, want 1", len(got.Relationships))
+	}
+	rel := got.Relationships[0]
+	if rel.TargetID != "01KTPROJECT000000000000001" {
+		t.Fatalf("target_id = %q, want project id", rel.TargetID)
+	}
+	if rel.Type != RelationshipUsesTool {
+		t.Fatalf("type = %q, want %q", rel.Type, RelationshipUsesTool)
+	}
+	if rel.Note != "Hermes calls Recall over MCP" {
+		t.Fatalf("note = %q, want note", rel.Note)
+	}
+}
+
+func TestParseLegacyLinksAsRelatedToRelationships(t *testing.T) {
+	data := []byte(`---
+id: 01KTRELATIONSHIP000000000001
+title: Legacy links
+domain: tools
+created: "2026-06-09"
+updated: "2026-06-09"
+lifecycle: evergreen
+links:
+  - 01KTPROJECT000000000000001
+---
+
+Legacy links still work.
+`)
+
+	got, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(got.Relationships) != 1 {
+		t.Fatalf("relationships len = %d, want 1", len(got.Relationships))
+	}
+	if got.Relationships[0].TargetID != "01KTPROJECT000000000000001" || got.Relationships[0].Type != RelationshipRelatedTo {
+		t.Fatalf("relationship = %+v, want related_to legacy link", got.Relationships[0])
+	}
+}
+
+func TestValidateRelationships(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*Memory)
+		wantErr bool
+	}{
+		{"valid relationship", func(m *Memory) {
+			m.Relationships = []Relationship{{TargetID: "01KTARGET000000000000000001", Type: RelationshipRelatedTo}}
+		}, false},
+		{"missing target", func(m *Memory) {
+			m.Relationships = []Relationship{{Type: RelationshipRelatedTo}}
+		}, true},
+		{"self relationship", func(m *Memory) {
+			m.Relationships = []Relationship{{TargetID: m.ID, Type: RelationshipRelatedTo}}
+		}, true},
+		{"missing type", func(m *Memory) {
+			m.Relationships = []Relationship{{TargetID: "01KTARGET000000000000000001"}}
+		}, true},
+		{"invalid type", func(m *Memory) {
+			m.Relationships = []Relationship{{TargetID: "01KTARGET000000000000000001", Type: RelationshipType("bad_type")}}
+		}, true},
+		{"long note", func(m *Memory) {
+			m.Relationships = []Relationship{{TargetID: "01KTARGET000000000000000001", Type: RelationshipRelatedTo, Note: strings.Repeat("x", 301)}}
+		}, true},
+		{"duplicate edge", func(m *Memory) {
+			m.Relationships = []Relationship{
+				{TargetID: "01KTARGET000000000000000001", Type: RelationshipRelatedTo},
+				{TargetID: "01KTARGET000000000000000001", Type: RelationshipRelatedTo},
+			}
+		}, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := sampleMemory(t)
+			tc.mutate(&m)
+			err := m.Validate()
+			if tc.wantErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		name    string

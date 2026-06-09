@@ -58,20 +58,21 @@ func printJSON(v any) error {
 }
 
 type memoryJSONOutput struct {
-	ID         string   `json:"id"`
-	Title      string   `json:"title"`
-	Domain     string   `json:"domain"`
-	Tags       []string `json:"tags"`
-	Project    string   `json:"project"`
-	Lifecycle  string   `json:"lifecycle"`
-	ExpiresOn  string   `json:"expires_on"`
-	Created    string   `json:"created"`
-	Updated    string   `json:"updated"`
-	Source     string   `json:"source"`
-	Links      []string `json:"links"`
-	Importance int      `json:"importance"`
-	Path       string   `json:"path"`
-	Body       string   `json:"body"`
+	ID            string                `json:"id"`
+	Title         string                `json:"title"`
+	Domain        string                `json:"domain"`
+	Tags          []string              `json:"tags"`
+	Project       string                `json:"project"`
+	Lifecycle     string                `json:"lifecycle"`
+	ExpiresOn     string                `json:"expires_on"`
+	Created       string                `json:"created"`
+	Updated       string                `json:"updated"`
+	Source        string                `json:"source"`
+	Links         []string              `json:"links"`
+	Relationships []memory.Relationship `json:"relationships"`
+	Importance    int                   `json:"importance"`
+	Path          string                `json:"path"`
+	Body          string                `json:"body"`
 }
 
 type domainOutput struct {
@@ -96,10 +97,14 @@ func memoryOutput(m memory.Memory, relPath string) memoryJSONOutput {
 	if links == nil {
 		links = []string{}
 	}
+	relationships := m.Relationships
+	if relationships == nil {
+		relationships = []memory.Relationship{}
+	}
 	return memoryJSONOutput{
 		ID: m.ID, Title: m.Title, Domain: m.Domain, Tags: tags, Project: m.Project,
 		Lifecycle: string(m.Lifecycle), ExpiresOn: m.ExpiresOn.String(),
 		Created: m.Created.String(), Updated: m.Updated.String(), Source: m.Source,
-		Links: links, Importance: m.Importance, Path: relPath, Body: m.Body,
+		Links: links, Relationships: relationships, Importance: m.Importance, Path: relPath, Body: m.Body,
 	}
 }

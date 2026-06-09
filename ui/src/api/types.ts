@@ -20,6 +20,22 @@ export interface MemoryHit {
 
 export type Lifecycle = 'evergreen' | 'expires'
 
+export type RelationshipType =
+  | 'related_to'
+  | 'about_project'
+  | 'uses_tool'
+  | 'depends_on'
+  | 'decided_by'
+  | 'supersedes'
+  | 'contradicts'
+  | 'references_person'
+
+export interface Relationship {
+  target_id: string
+  type: RelationshipType
+  note?: string
+}
+
 export interface MemoryDetail {
   id: string
   title: string
@@ -32,6 +48,7 @@ export interface MemoryDetail {
   updated: string
   source: string
   links: string[]
+  relationships: Relationship[]
   importance: number
   path: string
   body: string
@@ -59,6 +76,7 @@ export interface CreateMemoryParams {
   expires_on?: string
   source?: string
   links?: string[]
+  relationships?: Relationship[]
   importance?: number
 }
 
@@ -71,5 +89,6 @@ export interface UpdateMemoryParams {
   expires_on?: string
   source?: string
   links?: string[]
+  relationships?: Relationship[]
   importance?: number
 }

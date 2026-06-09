@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"recall/internal/index"
+	"recall/internal/memory"
 	"recall/internal/recall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -129,6 +130,9 @@ func TestMCPAddSearchGetFlow(t *testing.T) {
 		"domain":     "tools",
 		"tags":       []string{"deploy"},
 		"importance": 5,
+		"relationships": []map[string]any{
+			{"target_id": "01TARGET000000000000000001", "type": "uses_tool", "note": "mcp edge"},
+		},
 	}, &added)
 	if added.ID == "" || added.Path == "" {
 		t.Fatalf("add returned empty: %+v", added)
@@ -146,6 +150,9 @@ func TestMCPAddSearchGetFlow(t *testing.T) {
 	call(t, s, "recall_get", map[string]any{"id": added.ID}, &got)
 	if got.Title != "Kamal deploy" || got.Domain != "tools" || got.Importance != 5 {
 		t.Fatalf("get = %+v", got)
+	}
+	if len(got.Relationships) != 1 || got.Relationships[0].Type != memory.RelationshipUsesTool || got.Relationships[0].Note != "mcp edge" {
+		t.Fatalf("get relationships = %+v", got.Relationships)
 	}
 	// Full Markdown body is returned to the agent, formatting intact.
 	if got.Body == "" {

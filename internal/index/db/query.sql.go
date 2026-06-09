@@ -36,6 +36,29 @@ func (q *Queries) DeleteMemory(ctx context.Context, id string) error {
 	return err
 }
 
+const deleteRelationshipsForMemory = `-- name: DeleteRelationshipsForMemory :exec
+DELETE FROM memory_relationships WHERE source_id = ?
+`
+
+func (q *Queries) DeleteRelationshipsForMemory(ctx context.Context, sourceID string) error {
+	_, err := q.db.ExecContext(ctx, deleteRelationshipsForMemory, sourceID)
+	return err
+}
+
+const deleteRelationshipsTouchingMemory = `-- name: DeleteRelationshipsTouchingMemory :exec
+DELETE FROM memory_relationships WHERE source_id = ? OR target_id = ?
+`
+
+type DeleteRelationshipsTouchingMemoryParams struct {
+	SourceID string
+	TargetID string
+}
+
+func (q *Queries) DeleteRelationshipsTouchingMemory(ctx context.Context, arg DeleteRelationshipsTouchingMemoryParams) error {
+	_, err := q.db.ExecContext(ctx, deleteRelationshipsTouchingMemory, arg.SourceID, arg.TargetID)
+	return err
+}
+
 const deleteTagsForMemory = `-- name: DeleteTagsForMemory :exec
 DELETE FROM tags WHERE memory_id = ?
 `
@@ -96,6 +119,39 @@ func (q *Queries) GetMemory(ctx context.Context, id string) (Memory, error) {
 	return i, err
 }
 
+const getRelationshipsForMemory = `-- name: GetRelationshipsForMemory :many
+SELECT target_id, type, note FROM memory_relationships WHERE source_id = ? ORDER BY target_id, type
+`
+
+type GetRelationshipsForMemoryRow struct {
+	TargetID string
+	Type     string
+	Note     string
+}
+
+func (q *Queries) GetRelationshipsForMemory(ctx context.Context, sourceID string) ([]GetRelationshipsForMemoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, getRelationshipsForMemory, sourceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRelationshipsForMemoryRow{}
+	for rows.Next() {
+		var i GetRelationshipsForMemoryRow
+		if err := rows.Scan(&i.TargetID, &i.Type, &i.Note); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTagsForMemory = `-- name: GetTagsForMemory :many
 SELECT tag FROM tags WHERE memory_id = ? ORDER BY tag
 `
@@ -149,6 +205,27 @@ type InsertLinkParams struct {
 
 func (q *Queries) InsertLink(ctx context.Context, arg InsertLinkParams) error {
 	_, err := q.db.ExecContext(ctx, insertLink, arg.MemoryID, arg.TargetID)
+	return err
+}
+
+const insertRelationship = `-- name: InsertRelationship :exec
+INSERT INTO memory_relationships (source_id, target_id, type, note) VALUES (?, ?, ?, ?)
+`
+
+type InsertRelationshipParams struct {
+	SourceID string
+	TargetID string
+	Type     string
+	Note     string
+}
+
+func (q *Queries) InsertRelationship(ctx context.Context, arg InsertRelationshipParams) error {
+	_, err := q.db.ExecContext(ctx, insertRelationship,
+		arg.SourceID,
+		arg.TargetID,
+		arg.Type,
+		arg.Note,
+	)
 	return err
 }
 

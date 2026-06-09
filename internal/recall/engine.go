@@ -65,16 +65,17 @@ func (e *Engine) Vault() *vault.Vault { return e.vault }
 // AddParams describes a new memory. Lifecycle defaults to evergreen; ExpiresOn
 // is required (and only valid) when Lifecycle is "expires".
 type AddParams struct {
-	Title      string
-	Body       string
-	Domain     string
-	Tags       []string
-	Project    string
-	Lifecycle  string
-	ExpiresOn  string
-	Source     string
-	Links      []string
-	Importance int
+	Title         string
+	Body          string
+	Domain        string
+	Tags          []string
+	Project       string
+	Lifecycle     string
+	ExpiresOn     string
+	Source        string
+	Links         []string
+	Relationships []memory.Relationship
+	Importance    int
 }
 
 // Add creates a memory: writes its Markdown file (truth) then indexes it.
@@ -86,17 +87,18 @@ func (e *Engine) Add(ctx context.Context, p AddParams) (memory.Memory, string, e
 
 	today := memory.Today()
 	m := memory.Memory{
-		ID:         memory.NewID(),
-		Title:      p.Title,
-		Domain:     p.Domain,
-		Tags:       p.Tags,
-		Project:    p.Project,
-		Created:    today,
-		Updated:    today,
-		Importance: importanceOrDefault(p.Importance),
-		Source:     p.Source,
-		Links:      p.Links,
-		Body:       p.Body,
+		ID:            memory.NewID(),
+		Title:         p.Title,
+		Domain:        p.Domain,
+		Tags:          p.Tags,
+		Project:       p.Project,
+		Created:       today,
+		Updated:       today,
+		Importance:    importanceOrDefault(p.Importance),
+		Source:        p.Source,
+		Links:         p.Links,
+		Relationships: p.Relationships,
+		Body:          p.Body,
 	}
 	if err := applyLifecycle(&m, p.Lifecycle, p.ExpiresOn); err != nil {
 		return memory.Memory{}, "", err
@@ -169,15 +171,16 @@ func (e *Engine) MemoryCount(ctx context.Context) (int, error) {
 // UpdateParams holds optional edits; only non-nil fields are applied. The
 // memory's domain cannot change here.
 type UpdateParams struct {
-	Title      *string
-	Body       *string
-	Tags       *[]string
-	Project    *string
-	Lifecycle  *string
-	ExpiresOn  *string
-	Source     *string
-	Links      *[]string
-	Importance *int
+	Title         *string
+	Body          *string
+	Tags          *[]string
+	Project       *string
+	Lifecycle     *string
+	ExpiresOn     *string
+	Source        *string
+	Links         *[]string
+	Relationships *[]memory.Relationship
+	Importance    *int
 }
 
 // Update applies partial edits to an existing memory, bumps its Updated date,
@@ -207,6 +210,9 @@ func (e *Engine) Update(ctx context.Context, id string, p UpdateParams) (memory.
 	}
 	if p.Links != nil {
 		m.Links = *p.Links
+	}
+	if p.Relationships != nil {
+		m.Relationships = *p.Relationships
 	}
 	if p.Importance != nil {
 		m.Importance = *p.Importance

@@ -27,38 +27,88 @@ const (
 	Expires Lifecycle = "expires"
 )
 
+// RelationshipType classifies a directed edge from one memory to another.
+type RelationshipType string
+
+const (
+	RelationshipRelatedTo        RelationshipType = "related_to"
+	RelationshipAboutProject     RelationshipType = "about_project"
+	RelationshipUsesTool         RelationshipType = "uses_tool"
+	RelationshipDependsOn        RelationshipType = "depends_on"
+	RelationshipDecidedBy        RelationshipType = "decided_by"
+	RelationshipSupersedes       RelationshipType = "supersedes"
+	RelationshipContradicts      RelationshipType = "contradicts"
+	RelationshipReferencesPerson RelationshipType = "references_person"
+)
+
+var validRelationshipTypes = map[RelationshipType]struct{}{
+	RelationshipRelatedTo:        {},
+	RelationshipAboutProject:     {},
+	RelationshipUsesTool:         {},
+	RelationshipDependsOn:        {},
+	RelationshipDecidedBy:        {},
+	RelationshipSupersedes:       {},
+	RelationshipContradicts:      {},
+	RelationshipReferencesPerson: {},
+}
+
+var relationshipTypeNames = []string{
+	string(RelationshipRelatedTo),
+	string(RelationshipAboutProject),
+	string(RelationshipUsesTool),
+	string(RelationshipDependsOn),
+	string(RelationshipDecidedBy),
+	string(RelationshipSupersedes),
+	string(RelationshipContradicts),
+	string(RelationshipReferencesPerson),
+}
+
+// RelationshipTypeNames returns supported relationship type names.
+func RelationshipTypeNames() []string {
+	return append([]string(nil), relationshipTypeNames...)
+}
+
+// Relationship is a directed graph edge from this memory to TargetID.
+type Relationship struct {
+	TargetID string           `yaml:"target_id" json:"target_id"`
+	Type     RelationshipType `yaml:"type" json:"type"`
+	Note     string           `yaml:"note,omitempty" json:"note,omitempty"`
+}
+
 // Memory is a single recall record: one fact, stored as one Markdown file.
 type Memory struct {
-	ID         string    // ULID, links the MD file to its SQLite row
-	Title      string    // short headline
-	Domain     string    // folder name (tools, people, projects, ...)
-	Tags       []string  // free-form labels
-	Project    string    // optional grouping key (e.g. "acme")
-	Created    Date      // creation date
-	Updated    Date      // last-modified date
-	Importance int       // 1 (low) through 5 (critical), defaults to 3
-	Lifecycle  Lifecycle // evergreen | expires
-	ExpiresOn  Date      // hard expiry date; required iff Lifecycle == Expires
-	Source     string    // who/what produced it: agent name, person, or URL
-	Links      []string  // ids of related memories
-	Body       string    // the fact itself, as Markdown
+	ID            string         // ULID, links the MD file to its SQLite row
+	Title         string         // short headline
+	Domain        string         // folder name (tools, people, projects, ...)
+	Tags          []string       // free-form labels
+	Project       string         // optional grouping key (e.g. "acme")
+	Created       Date           // creation date
+	Updated       Date           // last-modified date
+	Importance    int            // 1 (low) through 5 (critical), defaults to 3
+	Lifecycle     Lifecycle      // evergreen | expires
+	ExpiresOn     Date           // hard expiry date; required iff Lifecycle == Expires
+	Source        string         // who/what produced it: agent name, person, or URL
+	Links         []string       // legacy ids of related memories
+	Relationships []Relationship // typed directed edges to other memories
+	Body          string         // the fact itself, as Markdown
 }
 
 // frontmatter is the YAML header serialized at the top of each memory file.
 // Optional fields use omitempty so emitted files stay clean.
 type frontmatter struct {
-	ID         string   `yaml:"id"`
-	Title      string   `yaml:"title"`
-	Domain     string   `yaml:"domain"`
-	Tags       []string `yaml:"tags,omitempty"`
-	Project    string   `yaml:"project,omitempty"`
-	Created    Date     `yaml:"created"`
-	Updated    Date     `yaml:"updated"`
-	Importance int      `yaml:"importance,omitempty"`
-	Lifecycle  string   `yaml:"lifecycle"`
-	ExpiresOn  *Date    `yaml:"expires_on,omitempty"`
-	Source     string   `yaml:"source,omitempty"`
-	Links      []string `yaml:"links,omitempty"`
+	ID            string         `yaml:"id"`
+	Title         string         `yaml:"title"`
+	Domain        string         `yaml:"domain"`
+	Tags          []string       `yaml:"tags,omitempty"`
+	Project       string         `yaml:"project,omitempty"`
+	Created       Date           `yaml:"created"`
+	Updated       Date           `yaml:"updated"`
+	Importance    int            `yaml:"importance,omitempty"`
+	Lifecycle     string         `yaml:"lifecycle"`
+	ExpiresOn     *Date          `yaml:"expires_on,omitempty"`
+	Source        string         `yaml:"source,omitempty"`
+	Links         []string       `yaml:"links,omitempty"`
+	Relationships []Relationship `yaml:"relationships,omitempty"`
 }
 
 // NewID returns a fresh lexicographically-sortable ULID string.
@@ -119,21 +169,28 @@ func Parse(data []byte) (Memory, error) {
 	}
 
 	m := Memory{
-		ID:         fm.ID,
-		Title:      fm.Title,
-		Domain:     fm.Domain,
-		Tags:       fm.Tags,
-		Project:    fm.Project,
-		Created:    fm.Created,
-		Updated:    fm.Updated,
-		Importance: fm.Importance,
-		Lifecycle:  Lifecycle(fm.Lifecycle),
-		Source:     fm.Source,
-		Links:      fm.Links,
-		Body:       strings.TrimSpace(body) + "\n",
+		ID:            fm.ID,
+		Title:         fm.Title,
+		Domain:        fm.Domain,
+		Tags:          fm.Tags,
+		Project:       fm.Project,
+		Created:       fm.Created,
+		Updated:       fm.Updated,
+		Importance:    fm.Importance,
+		Lifecycle:     Lifecycle(fm.Lifecycle),
+		Source:        fm.Source,
+		Links:         fm.Links,
+		Relationships: fm.Relationships,
+		Body:          strings.TrimSpace(body) + "\n",
 	}
 	if m.Importance == 0 {
 		m.Importance = 3
+	}
+	if len(m.Relationships) == 0 && len(m.Links) > 0 {
+		m.Relationships = make([]Relationship, 0, len(m.Links))
+		for _, link := range m.Links {
+			m.Relationships = append(m.Relationships, Relationship{TargetID: link, Type: RelationshipRelatedTo})
+		}
 	}
 	if fm.ExpiresOn != nil {
 		m.ExpiresOn = *fm.ExpiresOn
@@ -144,17 +201,18 @@ func Parse(data []byte) (Memory, error) {
 // Marshal renders the memory back to its on-disk Markdown+frontmatter form.
 func (m Memory) Marshal() ([]byte, error) {
 	fm := frontmatter{
-		ID:         m.ID,
-		Title:      m.Title,
-		Domain:     m.Domain,
-		Tags:       m.Tags,
-		Project:    m.Project,
-		Created:    m.Created,
-		Updated:    m.Updated,
-		Importance: m.Importance,
-		Lifecycle:  string(m.Lifecycle),
-		Source:     m.Source,
-		Links:      m.Links,
+		ID:            m.ID,
+		Title:         m.Title,
+		Domain:        m.Domain,
+		Tags:          m.Tags,
+		Project:       m.Project,
+		Created:       m.Created,
+		Updated:       m.Updated,
+		Importance:    m.Importance,
+		Lifecycle:     string(m.Lifecycle),
+		Source:        m.Source,
+		Links:         m.Links,
+		Relationships: m.Relationships,
 	}
 	if !m.ExpiresOn.IsZero() {
 		d := m.ExpiresOn
@@ -200,6 +258,26 @@ func (m Memory) Validate() error {
 	}
 	if m.Importance < 1 || m.Importance > 5 {
 		return fmt.Errorf("%w: importance must be between 1 and 5, got %d", ErrValidation, m.Importance)
+	}
+	seenRelationships := make(map[string]struct{}, len(m.Relationships))
+	for i, rel := range m.Relationships {
+		if strings.TrimSpace(rel.TargetID) == "" {
+			return fmt.Errorf("%w: relationship %d target_id is required", ErrValidation, i)
+		}
+		if rel.TargetID == m.ID {
+			return fmt.Errorf("%w: relationship %d must not target its source memory", ErrValidation, i)
+		}
+		if _, ok := validRelationshipTypes[rel.Type]; !ok {
+			return fmt.Errorf("%w: relationship %d type must be one of %s, got %q", ErrValidation, i, strings.Join(RelationshipTypeNames(), ", "), rel.Type)
+		}
+		if len(rel.Note) > 300 {
+			return fmt.Errorf("%w: relationship %d note must be at most 300 chars", ErrValidation, i)
+		}
+		key := rel.TargetID + "\x00" + string(rel.Type)
+		if _, exists := seenRelationships[key]; exists {
+			return fmt.Errorf("%w: duplicate relationship target_id/type: %s/%s", ErrValidation, rel.TargetID, rel.Type)
+		}
+		seenRelationships[key] = struct{}{}
 	}
 	switch m.Lifecycle {
 	case Evergreen:

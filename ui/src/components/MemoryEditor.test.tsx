@@ -31,6 +31,7 @@ function memory(overrides: Partial<MemoryDetail> = {}): MemoryDetail {
     updated: '2026-06-08',
     source: '',
     links: [],
+    relationships: [],
     importance: 3,
     path: 'tools/original.md',
     body: 'Original body',
@@ -105,5 +106,18 @@ describe('MemoryEditor expiry validation', () => {
       }),
       expect.any(Object),
     )
+  })
+
+  it('shows typed relationships in metadata panel', async () => {
+    const user = userEvent.setup()
+    render(<MemoryEditor memory={memory({
+      relationships: [{ target_id: '01TARGET000000000000000001', type: 'uses_tool', note: 'via MCP' }],
+    })} onSaved={vi.fn()} onDeleted={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /metadata/i }))
+
+    expect(screen.getByText(/uses_tool/i)).toBeInTheDocument()
+    expect(screen.getByText(/01TARGET000000000000000001/i)).toBeInTheDocument()
+    expect(screen.getByText(/via MCP/i)).toBeInTheDocument()
   })
 })

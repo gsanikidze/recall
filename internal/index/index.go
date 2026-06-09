@@ -133,6 +133,20 @@ func (ix *Index) Upsert(ctx context.Context, relPath string, m memory.Memory) er
 		}
 	}
 
+	if err := qtx.DeleteRelationshipsForMemory(ctx, m.ID); err != nil {
+		return fmt.Errorf("index: clear relationships: %w", err)
+	}
+	for _, rel := range dedupeRelationships(m.Relationships) {
+		if err := qtx.InsertRelationship(ctx, db.InsertRelationshipParams{
+			SourceID: m.ID,
+			TargetID: rel.TargetID,
+			Type:     string(rel.Type),
+			Note:     rel.Note,
+		}); err != nil {
+			return fmt.Errorf("index: insert relationship: %w", err)
+		}
+	}
+
 	if err := qtx.DeleteFTSForMemory(ctx, m.ID); err != nil {
 		return fmt.Errorf("index: clear fts: %w", err)
 	}
@@ -163,6 +177,9 @@ func (ix *Index) Delete(ctx context.Context, id string) error {
 	}
 	if err := qtx.DeleteLinksForMemory(ctx, id); err != nil {
 		return fmt.Errorf("index: delete links: %w", err)
+	}
+	if err := qtx.DeleteRelationshipsTouchingMemory(ctx, db.DeleteRelationshipsTouchingMemoryParams{SourceID: id, TargetID: id}); err != nil {
+		return fmt.Errorf("index: delete relationships: %w", err)
 	}
 	if err := qtx.DeleteFTSForMemory(ctx, id); err != nil {
 		return fmt.Errorf("index: delete fts: %w", err)
@@ -198,6 +215,23 @@ func dedupe(in []string) []string {
 		}
 		seen[s] = struct{}{}
 		out = append(out, s)
+	}
+	return out
+}
+
+func dedupeRelationships(in []memory.Relationship) []memory.Relationship {
+	seen := make(map[string]struct{}, len(in))
+	out := make([]memory.Relationship, 0, len(in))
+	for _, rel := range in {
+		if rel.TargetID == "" || rel.Type == "" {
+			continue
+		}
+		key := rel.TargetID + "\x00" + string(rel.Type)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, rel)
 	}
 	return out
 }

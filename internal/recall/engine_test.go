@@ -178,6 +178,48 @@ func TestUpdateImportance(t *testing.T) {
 	}
 }
 
+func TestAddRelationships(t *testing.T) {
+	e := newEngine(t)
+	ctx := context.Background()
+
+	m, _, err := e.Add(ctx, AddParams{
+		Title:  "Graph fact",
+		Body:   "Hermes uses Recall MCP.",
+		Domain: "tools",
+		Relationships: []memory.Relationship{
+			{TargetID: "01PROJECT000000000000000001", Type: memory.RelationshipUsesTool, Note: "via MCP"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	got, _, err := e.Get(ctx, m.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if len(got.Relationships) != 1 || got.Relationships[0].Type != memory.RelationshipUsesTool {
+		t.Fatalf("relationships = %+v, want uses_tool edge", got.Relationships)
+	}
+}
+
+func TestUpdateRelationships(t *testing.T) {
+	e := newEngine(t)
+	ctx := context.Background()
+	m, _, err := e.Add(ctx, AddParams{Title: "Graph fact", Body: "old", Domain: "tools"})
+	if err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	rels := []memory.Relationship{{TargetID: "01PROJECT000000000000000001", Type: memory.RelationshipAboutProject}}
+	updated, _, err := e.Update(ctx, m.ID, UpdateParams{Relationships: &rels})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if len(updated.Relationships) != 1 || updated.Relationships[0].Type != memory.RelationshipAboutProject {
+		t.Fatalf("relationships = %+v, want about_project edge", updated.Relationships)
+	}
+}
+
 func TestAddUnknownDomainRejected(t *testing.T) {
 	e := newEngine(t)
 	if _, _, err := e.Add(context.Background(), AddParams{Title: "x", Body: "y", Domain: "nope"}); err == nil {

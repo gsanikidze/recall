@@ -30,6 +30,13 @@ type Memory struct {
 	Body       string
 }
 
+type MemoryRelationship struct {
+	SourceID string
+	TargetID string
+	Type     string
+	Note     string
+}
+
 type Tag struct {
 	MemoryID string
 	Tag      string

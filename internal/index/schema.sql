@@ -32,6 +32,14 @@ CREATE TABLE links (
     UNIQUE(memory_id, target_id)
 );
 
+CREATE TABLE memory_relationships (
+    source_id TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    target_id TEXT NOT NULL,
+    type      TEXT NOT NULL,
+    note      TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (source_id, target_id, type)
+);
+
 CREATE TABLE memories_fts (
     id    TEXT PRIMARY KEY,
     title TEXT NOT NULL,

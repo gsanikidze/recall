@@ -70,6 +70,16 @@ Add memory:
 recall add --title "SQLite WAL note" --domain tools --tags sqlite,go --importance 4 --body "Use WAL plus busy_timeout for local concurrent reads/writes."
 ```
 
+Add typed relationships as graph edges:
+
+```bash
+recall add \
+  --title "Hermes uses Recall MCP" \
+  --domain tools \
+  --relationships '[{"target_id":"01PROJECT...","type":"uses_tool","note":"stdio MCP"}]' \
+  --body "Hermes stores durable memory in Recall over MCP."
+```
+
 Pipe body from stdin:
 
 ```bash
@@ -84,6 +94,8 @@ recall search --tag go --project recall --json
 ```
 
 Importance is an integer from 1–5. `3` is default durable memory; `5` is critical operating context such as stable paths, preferences, and integration configs. Search ranking blends full-text relevance, recency, and importance.
+
+Relationships are typed directed edges from one memory to another. Supported types: `related_to`, `about_project`, `uses_tool`, `depends_on`, `decided_by`, `supersedes`, `contradicts`, `references_person`. Markdown frontmatter is source of truth; SQLite stores `memory_relationships` as rebuildable graph index rows.
 
 Get memory:
 

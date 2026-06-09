@@ -11,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"recall/internal/memory"
 	"recall/internal/recall"
 )
 
@@ -104,7 +105,7 @@ func TestCORSAllowlistForViteOrigins(t *testing.T) {
 func TestMemoryCRUDHappyPath(t *testing.T) {
 	_, app := newTestApp(t)
 
-	create := doReq(t, app, http.MethodPost, "/api/memories", `{"title":"API memory","body":"api body","domain":"tools","tags":["api"],"importance":5}`)
+	create := doReq(t, app, http.MethodPost, "/api/memories", `{"title":"API memory","body":"api body","domain":"tools","tags":["api"],"importance":5,"relationships":[{"target_id":"01TARGET000000000000000001","type":"uses_tool","note":"api edge"}]}`)
 	if create.StatusCode != http.StatusCreated {
 		t.Fatalf("create status = %d, want 201", create.StatusCode)
 	}
@@ -124,6 +125,9 @@ func TestMemoryCRUDHappyPath(t *testing.T) {
 	decodeJSON(t, get, &got)
 	if got.Title != "API memory" || got.Body == "" || got.Path == "" || got.Importance != 5 {
 		t.Fatalf("get body = %+v", got)
+	}
+	if len(got.Relationships) != 1 || got.Relationships[0].Type != memory.RelationshipUsesTool || got.Relationships[0].Note != "api edge" {
+		t.Fatalf("get relationships = %+v", got.Relationships)
 	}
 
 	list := doReq(t, app, http.MethodGet, "/api/memories?q=api", "")

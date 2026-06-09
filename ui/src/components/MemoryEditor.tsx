@@ -38,6 +38,7 @@ export function MemoryEditor({ memory, onSaved, onDeleted, onDirtyChange }: Prop
           expires_on: expiresOn,
           source: draft.source,
           links: draft.links,
+          relationships: draft.relationships,
           importance: draft.importance,
         },
       },
@@ -57,6 +58,9 @@ export function MemoryEditor({ memory, onSaved, onDeleted, onDirtyChange }: Prop
     })
   }
 
+  const relationshipKey = (relationships: MemoryDetail['relationships']) =>
+    relationships.map(rel => `${rel.target_id}\0${rel.type}\0${rel.note ?? ''}`).join('\0\0')
+
   const isDirty =
     draft.title !== memory.title ||
     draft.body !== memory.body ||
@@ -66,7 +70,8 @@ export function MemoryEditor({ memory, onSaved, onDeleted, onDirtyChange }: Prop
     draft.source !== memory.source ||
     draft.importance !== memory.importance ||
     draft.tags.join('\0') !== memory.tags.join('\0') ||
-    draft.links.join('\0') !== memory.links.join('\0')
+    draft.links.join('\0') !== memory.links.join('\0') ||
+    relationshipKey(draft.relationships) !== relationshipKey(memory.relationships)
 
   useEffect(() => {
     onDirtyChange?.(isDirty)

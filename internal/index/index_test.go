@@ -276,6 +276,65 @@ func TestUpsertReplacesTagsAndDelete(t *testing.T) {
 	}
 }
 
+func TestUpsertReplacesRelationshipsAndDelete(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	m := mem(t, "01REL", "Recall graph", "projects", "relationships create graph context")
+	m.Relationships = []memory.Relationship{
+		{TargetID: "01TARGETA", Type: memory.RelationshipUsesTool, Note: "uses MCP"},
+		{TargetID: "01TARGETB", Type: memory.RelationshipDependsOn},
+	}
+	if err := ix.Upsert(ctx, "projects/graph.md", m); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	assertRelationshipRows(t, ix, "01REL", []memory.Relationship{
+		{TargetID: "01TARGETA", Type: memory.RelationshipUsesTool, Note: "uses MCP"},
+		{TargetID: "01TARGETB", Type: memory.RelationshipDependsOn},
+	})
+
+	m.Relationships = []memory.Relationship{{TargetID: "01TARGETC", Type: memory.RelationshipSupersedes, Note: "new fact"}}
+	if err := ix.Upsert(ctx, "projects/graph.md", m); err != nil {
+		t.Fatalf("re-Upsert: %v", err)
+	}
+	assertRelationshipRows(t, ix, "01REL", []memory.Relationship{{TargetID: "01TARGETC", Type: memory.RelationshipSupersedes, Note: "new fact"}})
+
+	if err := ix.Delete(ctx, "01REL"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	assertRelationshipRows(t, ix, "01REL", nil)
+}
+
+func assertRelationshipRows(t *testing.T, ix *Index, memoryID string, want []memory.Relationship) {
+	t.Helper()
+	rows, err := ix.sql.Query("SELECT target_id, type, note FROM memory_relationships WHERE source_id = ? ORDER BY target_id, type", memoryID)
+	if err != nil {
+		t.Fatalf("query relationships: %v", err)
+	}
+	defer rows.Close()
+	var got []memory.Relationship
+	for rows.Next() {
+		var rel memory.Relationship
+		var relType string
+		if err := rows.Scan(&rel.TargetID, &relType, &rel.Note); err != nil {
+			t.Fatalf("scan relationship: %v", err)
+		}
+		rel.Type = memory.RelationshipType(relType)
+		got = append(got, rel)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("relationship rows: %v", err)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("relationships = %+v, want %+v", got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("relationships = %+v, want %+v", got, want)
+		}
+	}
+}
+
 func TestReopenPersistsAndMigratesOnce(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "recall.sqlite")

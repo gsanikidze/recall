@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"recall/internal/index"
+	"recall/internal/memory"
 	"recall/internal/recall"
 )
 
@@ -27,6 +29,7 @@ func Add(args []string) error {
 	expires := fs.String("expires", "", "expiry date YYYY-MM-DD (with --lifecycle expires)")
 	source := fs.String("source", "", "who/what produced this memory")
 	links := fs.String("links", "", "comma-separated related memory ids")
+	relationshipsJSON := fs.String("relationships", "", "JSON array of typed relationships [{target_id,type,note}]")
 	importance := fs.Int("importance", 0, "importance rank 1-5 (default 3)")
 	jsonOut := fs.Bool("json", false, "print JSON")
 	if err := fs.Parse(args); err != nil {
@@ -44,6 +47,10 @@ func Add(args []string) error {
 	if strings.TrimSpace(*title) == "" || strings.TrimSpace(text) == "" || *domain == "" {
 		return fmt.Errorf("add: --title, --domain, and a body (--body or stdin) are required")
 	}
+	relationships, err := parseRelationshipsFlag(*relationshipsJSON)
+	if err != nil {
+		return err
+	}
 
 	e, err := openEngine()
 	if err != nil {
@@ -52,16 +59,17 @@ func Add(args []string) error {
 	defer e.Close()
 
 	m, relPath, err := e.Add(context.Background(), recall.AddParams{
-		Title:      *title,
-		Body:       text,
-		Domain:     *domain,
-		Tags:       splitList(*tags),
-		Project:    *project,
-		Lifecycle:  *lifecycle,
-		ExpiresOn:  *expires,
-		Source:     *source,
-		Links:      splitList(*links),
-		Importance: *importance,
+		Title:         *title,
+		Body:          text,
+		Domain:        *domain,
+		Tags:          splitList(*tags),
+		Project:       *project,
+		Lifecycle:     *lifecycle,
+		ExpiresOn:     *expires,
+		Source:        *source,
+		Links:         splitList(*links),
+		Relationships: relationships,
+		Importance:    *importance,
 	})
 	if err != nil {
 		return err
@@ -74,6 +82,17 @@ func Add(args []string) error {
 	}
 	fmt.Printf("added %s\n%s\n", m.ID, filepath.Join("vault", relPath))
 	return nil
+}
+
+func parseRelationshipsFlag(raw string) ([]memory.Relationship, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+	var rels []memory.Relationship
+	if err := json.Unmarshal([]byte(raw), &rels); err != nil {
+		return nil, fmt.Errorf("add: --relationships must be JSON array of {target_id,type,note}: %w", err)
+	}
+	return rels, nil
 }
 
 // Search runs a query and prints ranked hits.
