@@ -12,13 +12,15 @@ export interface MemoryHit {
   score: number
 }
 
+export type Lifecycle = 'evergreen' | 'expires'
+
 export interface MemoryDetail {
   id: string
   title: string
   domain: string
   tags: string[]
   project: string
-  lifecycle: 'evergreen' | 'expires'
+  lifecycle: Lifecycle
   expires_on: string
   created: string
   updated: string
@@ -33,7 +35,7 @@ export interface MemoryFilter {
   domain?: string
   tags?: string
   project?: string
-  lifecycle?: string
+  lifecycle?: Lifecycle
   since?: string
   until?: string
   include_expired?: boolean
@@ -46,7 +48,7 @@ export interface CreateMemoryParams {
   domain: string
   tags?: string[]
   project?: string
-  lifecycle?: string
+  lifecycle?: Lifecycle
   expires_on?: string
   source?: string
   links?: string[]
@@ -57,7 +59,7 @@ export interface UpdateMemoryParams {
   body?: string
   tags?: string[]
   project?: string
-  lifecycle?: string
+  lifecycle?: Lifecycle
   expires_on?: string
   source?: string
   links?: string[]

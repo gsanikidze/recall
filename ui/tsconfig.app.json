@@ -18,6 +18,9 @@
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "ignoreDeprecations": "6.0",

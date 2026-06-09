@@ -8,7 +8,7 @@ import { MemoryEditor } from '@/components/MemoryEditor'
 import { NewMemoryDialog } from '@/components/NewMemoryDialog'
 import { useDomains, useMemories, useMemory, useReindex, keys } from '@/queries'
 import { useDebounce } from '@/lib/useDebounce'
-import type { MemoryDetail } from '@/api/types'
+import type { MemoryDetail, MemoryFilter } from '@/api/types'
 
 function AppShell() {
   const { domain, id } = useParams<{ domain?: string; id?: string }>()
@@ -21,7 +21,9 @@ function AppShell() {
   const debouncedQuery = useDebounce(searchQuery, 300)
 
   const { data: domains = [] } = useDomains()
-  const { data: memories = [], isLoading } = useMemories({ q: debouncedQuery, domain })
+  const memoryFilter: MemoryFilter = { q: debouncedQuery }
+  if (domain) memoryFilter.domain = domain
+  const { data: memories = [], isLoading } = useMemories(memoryFilter)
   const { data: selectedMemory } = useMemory(id ?? null)
 
   const reindexMutation = useReindex()

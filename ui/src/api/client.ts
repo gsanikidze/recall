@@ -31,8 +31,12 @@ function encodePathParam(value: string) {
   return encodeURIComponent(value)
 }
 
+function initWithSignal(signal?: AbortSignal): RequestInit {
+  return signal ? { signal } : {}
+}
+
 export async function listDomains(signal?: AbortSignal): Promise<Domain[]> {
-  const data = await request<{ domains: Domain[] }>('/api/domains', { signal })
+  const data = await request<{ domains: Domain[] }>('/api/domains', initWithSignal(signal))
   return data.domains
 }
 
@@ -47,12 +51,12 @@ export async function listMemories(filter: MemoryFilter = {}, signal?: AbortSign
   if (filter.until) params.set('until', filter.until)
   if (filter.include_expired) params.set('include_expired', 'true')
   if (filter.limit) params.set('limit', String(filter.limit))
-  const data = await request<{ memories: MemoryHit[] }>(`/api/memories?${params}`, { signal })
+  const data = await request<{ memories: MemoryHit[] }>(`/api/memories?${params}`, initWithSignal(signal))
   return data.memories ?? []
 }
 
 export async function getMemory(id: string, signal?: AbortSignal): Promise<MemoryDetail> {
-  return request<MemoryDetail>(`/api/memories/${encodePathParam(id)}`, { signal })
+  return request<MemoryDetail>(`/api/memories/${encodePathParam(id)}`, initWithSignal(signal))
 }
 
 export async function createMemory(params: CreateMemoryParams): Promise<{ id: string; path: string }> {
