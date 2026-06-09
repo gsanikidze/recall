@@ -17,6 +17,7 @@ function AppShell() {
 
   const [searchQuery, setSearchQuery] = useState('')
   const [showNew, setShowNew] = useState(false)
+  const [editorDirty, setEditorDirty] = useState(false)
 
   const debouncedQuery = useDebounce(searchQuery, 300)
 
@@ -28,16 +29,25 @@ function AppShell() {
 
   const reindexMutation = useReindex()
 
+  const guardedNavigate = useCallback((to: string, options?: { replace?: boolean }) => {
+    if (editorDirty && !window.confirm('Discard unsaved changes?')) return
+    setEditorDirty(false)
+    navigate(to, options)
+  }, [editorDirty, navigate])
+
   const handleSaved = useCallback((updated: MemoryDetail) => {
+    setEditorDirty(false)
     navigate(domain ? `/domains/${domain}/${updated.id}` : `/${updated.id}`, { replace: true })
   }, [navigate, domain])
 
   const handleDeleted = useCallback(() => {
+    setEditorDirty(false)
     navigate(domain ? `/domains/${domain}` : '/')
   }, [navigate, domain])
 
   const handleCreated = useCallback((newId: string) => {
     setShowNew(false)
+    setEditorDirty(false)
     navigate(domain ? `/domains/${domain}/${newId}` : `/${newId}`)
   }, [navigate, domain])
 
@@ -48,7 +58,7 @@ function AppShell() {
           <DomainSidebar
             domains={domains}
             selected={domain ?? null}
-            onSelect={d => navigate(d ? `/domains/${d}` : '/')}
+            onSelect={d => guardedNavigate(d ? `/domains/${d}` : '/')}
             onReindex={() => reindexMutation.mutate(undefined)}
             onAddDomain={() => qc.invalidateQueries({ queryKey: keys.domains() })}
             reindexing={reindexMutation.isPending}
@@ -61,7 +71,7 @@ function AppShell() {
             selectedId={id ?? null}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onSelect={memId => navigate(domain ? `/domains/${domain}/${memId}` : `/${memId}`)}
+            onSelect={memId => guardedNavigate(domain ? `/domains/${domain}/${memId}` : `/${memId}`)}
             onNew={() => setShowNew(true)}
           />
         }
@@ -72,6 +82,7 @@ function AppShell() {
               memory={selectedMemory}
               onSaved={handleSaved}
               onDeleted={handleDeleted}
+              onDirtyChange={setEditorDirty}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-white/20 text-sm gap-2">

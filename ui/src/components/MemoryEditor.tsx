@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import MDEditor from '@uiw/react-md-editor'
 import { Save, Trash2 } from 'lucide-react'
 import { MetadataPanel } from './MetadataPanel'
@@ -9,9 +9,10 @@ interface Props {
   memory: MemoryDetail
   onSaved: (updated: MemoryDetail) => void
   onDeleted: () => void
+  onDirtyChange?: (dirty: boolean) => void
 }
 
-export function MemoryEditor({ memory, onSaved, onDeleted }: Props) {
+export function MemoryEditor({ memory, onSaved, onDeleted, onDirtyChange }: Props) {
   const [draft, setDraft] = useState<MemoryDetail>(memory)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,6 +65,20 @@ export function MemoryEditor({ memory, onSaved, onDeleted }: Props) {
     draft.source !== memory.source ||
     draft.tags.join('\0') !== memory.tags.join('\0') ||
     draft.links.join('\0') !== memory.links.join('\0')
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
+
+  useEffect(() => {
+    if (!isDirty) return
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isDirty])
 
   const saving = updateMutation.isPending
   const deleting = deleteMutation.isPending

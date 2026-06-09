@@ -74,4 +74,19 @@ describe('MemoryEditor expiry validation', () => {
       expect.any(Object),
     )
   })
+
+  it('notifies dirty state and guards browser unload', async () => {
+    const user = userEvent.setup()
+    const onDirtyChange = vi.fn()
+    render(<MemoryEditor memory={memory()} onSaved={vi.fn()} onDeleted={vi.fn()} onDirtyChange={onDirtyChange} />)
+
+    await user.clear(screen.getByRole('textbox', { name: /memory title/i }))
+    await user.type(screen.getByRole('textbox', { name: /memory title/i }), 'Unsaved title')
+
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+  })
 })
