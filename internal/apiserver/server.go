@@ -236,14 +236,11 @@ func errResp(c *fiber.Ctx, err error) error {
 }
 
 func validationOrErrResp(c *fiber.Ctx, err error) error {
-	msg := err.Error()
 	status := fiber.StatusInternalServerError
-	if strings.Contains(msg, "required") || strings.Contains(msg, "invalid") ||
-		strings.Contains(msg, "lifecycle") || strings.Contains(msg, "expires_on") ||
-		strings.Contains(msg, "unknown domain") {
+	if errors.Is(err, recall.ErrValidation) || errors.Is(err, memory.ErrValidation) || errors.Is(err, index.ErrInvalidFilter) {
 		status = fiber.StatusUnprocessableEntity
 	}
-	return c.Status(status).JSON(fiber.Map{"error": msg})
+	return c.Status(status).JSON(fiber.Map{"error": err.Error()})
 }
 
 // dnsRebindGuard rejects requests whose Host header is not a loopback address,

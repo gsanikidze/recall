@@ -2,12 +2,16 @@ package index
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"recall/internal/memory"
 )
+
+// ErrInvalidFilter marks malformed user-supplied search filters.
+var ErrInvalidFilter = errors.New("index: invalid search filter")
 
 // defaultLimit caps result count when a caller does not specify one.
 const defaultLimit = 20
@@ -150,20 +154,20 @@ WHERE 1 = 1`)
 
 func validateFilter(f Filter) error {
 	if f.Lifecycle != "" && f.Lifecycle != string(memory.Evergreen) && f.Lifecycle != string(memory.Expires) {
-		return fmt.Errorf("index: lifecycle must be 'evergreen' or 'expires', got %q", f.Lifecycle)
+		return fmt.Errorf("%w: lifecycle must be 'evergreen' or 'expires', got %q", ErrInvalidFilter, f.Lifecycle)
 	}
 	if f.Since != "" {
 		if _, err := memory.ParseDate(f.Since); err != nil {
-			return fmt.Errorf("index: invalid since date: %w", err)
+			return fmt.Errorf("%w: invalid since date: %v", ErrInvalidFilter, err)
 		}
 	}
 	if f.Until != "" {
 		if _, err := memory.ParseDate(f.Until); err != nil {
-			return fmt.Errorf("index: invalid until date: %w", err)
+			return fmt.Errorf("%w: invalid until date: %v", ErrInvalidFilter, err)
 		}
 	}
 	if f.Since != "" && f.Until != "" && f.Since > f.Until {
-		return fmt.Errorf("index: since must be before or equal to until")
+		return fmt.Errorf("%w: since must be before or equal to until", ErrInvalidFilter)
 	}
 	return nil
 }

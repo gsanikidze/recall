@@ -23,6 +23,9 @@ import (
 // ErrNotFound is returned when a memory id is not in the index.
 var ErrNotFound = errors.New("recall: memory not found")
 
+// ErrValidation marks invalid user input at the engine boundary.
+var ErrValidation = errors.New("recall: validation failed")
+
 // Engine couples a vault with its index.
 type Engine struct {
 	vault *vault.Vault
@@ -285,10 +288,10 @@ func (e *Engine) Reindex(ctx context.Context) (ReindexStats, error) {
 // known, self-described domains. Agents discover valid domains via ListDomains.
 func (e *Engine) requireDomain(name string) error {
 	if name == "" {
-		return fmt.Errorf("recall: domain is required")
+		return fmt.Errorf("%w: domain is required", ErrValidation)
 	}
 	if !e.vault.HasDomain(name) {
-		return fmt.Errorf("recall: unknown domain %q (create it with `recall domain add` or pick an existing one)", name)
+		return fmt.Errorf("%w: unknown domain %q (create it with `recall domain add` or pick an existing one)", ErrValidation, name)
 	}
 	return nil
 }

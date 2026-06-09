@@ -5,6 +5,7 @@ package memory
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -12,6 +13,9 @@ import (
 	"github.com/oklog/ulid/v2"
 	"gopkg.in/yaml.v3"
 )
+
+// ErrValidation marks invalid user-supplied or stored memory data.
+var ErrValidation = errors.New("memory: validation failed")
 
 // Lifecycle controls how a memory ages.
 type Lifecycle string
@@ -74,15 +78,15 @@ func NormalizeLifecycle(lifecycle, expiresOn string) (Lifecycle, Date, error) {
 		return Evergreen, Date{}, nil
 	case Expires:
 		if expiresOn == "" {
-			return "", Date{}, fmt.Errorf("memory: lifecycle 'expires' requires expires_on (YYYY-MM-DD)")
+			return "", Date{}, fmt.Errorf("%w: lifecycle 'expires' requires expires_on (YYYY-MM-DD)", ErrValidation)
 		}
 		d, err := ParseDate(expiresOn)
 		if err != nil {
-			return "", Date{}, err
+			return "", Date{}, fmt.Errorf("%w: %v", ErrValidation, err)
 		}
 		return Expires, d, nil
 	default:
-		return "", Date{}, fmt.Errorf("memory: lifecycle must be 'evergreen' or 'expires', got %q", lifecycle)
+		return "", Date{}, fmt.Errorf("%w: lifecycle must be 'evergreen' or 'expires', got %q", ErrValidation, lifecycle)
 	}
 }
 
@@ -170,34 +174,34 @@ func (m Memory) Marshal() ([]byte, error) {
 // Validate checks the invariants every stored memory must satisfy.
 func (m Memory) Validate() error {
 	if m.ID == "" {
-		return fmt.Errorf("memory: id is required")
+		return fmt.Errorf("%w: id is required", ErrValidation)
 	}
 	if strings.TrimSpace(m.Title) == "" {
-		return fmt.Errorf("memory: title is required")
+		return fmt.Errorf("%w: title is required", ErrValidation)
 	}
 	if strings.TrimSpace(m.Domain) == "" {
-		return fmt.Errorf("memory: domain is required")
+		return fmt.Errorf("%w: domain is required", ErrValidation)
 	}
 	if m.Created.IsZero() {
-		return fmt.Errorf("memory: created date is required")
+		return fmt.Errorf("%w: created date is required", ErrValidation)
 	}
 	if m.Updated.IsZero() {
-		return fmt.Errorf("memory: updated date is required")
+		return fmt.Errorf("%w: updated date is required", ErrValidation)
 	}
 	if strings.TrimSpace(m.Body) == "" {
-		return fmt.Errorf("memory: body is required")
+		return fmt.Errorf("%w: body is required", ErrValidation)
 	}
 	switch m.Lifecycle {
 	case Evergreen:
 		if !m.ExpiresOn.IsZero() {
-			return fmt.Errorf("memory: evergreen memory must not set expires_on")
+			return fmt.Errorf("%w: evergreen memory must not set expires_on", ErrValidation)
 		}
 	case Expires:
 		if m.ExpiresOn.IsZero() {
-			return fmt.Errorf("memory: lifecycle 'expires' requires expires_on")
+			return fmt.Errorf("%w: lifecycle 'expires' requires expires_on", ErrValidation)
 		}
 	default:
-		return fmt.Errorf("memory: lifecycle must be 'evergreen' or 'expires', got %q", m.Lifecycle)
+		return fmt.Errorf("%w: lifecycle must be 'evergreen' or 'expires', got %q", ErrValidation, m.Lifecycle)
 	}
 	return nil
 }
