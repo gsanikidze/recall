@@ -2,7 +2,9 @@ package index
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"recall/internal/memory"
@@ -241,6 +243,63 @@ func TestReopenPersistsAndMigratesOnce(t *testing.T) {
 	defer ix2.Close()
 	if hits, _ := ix2.Search(ctx, Filter{Query: "stays"}); len(hits) != 1 {
 		t.Errorf("expected persisted memory, got %+v", hits)
+	}
+}
+
+func TestOpenConfiguresSQLitePragmas(t *testing.T) {
+	ix := openIndex(t)
+	var busyTimeout int
+	if err := ix.sql.QueryRow("PRAGMA busy_timeout").Scan(&busyTimeout); err != nil {
+		t.Fatalf("busy_timeout pragma: %v", err)
+	}
+	if busyTimeout < 5000 {
+		t.Fatalf("busy_timeout = %d, want at least 5000", busyTimeout)
+	}
+
+	var journalMode string
+	if err := ix.sql.QueryRow("PRAGMA journal_mode").Scan(&journalMode); err != nil {
+		t.Fatalf("journal_mode pragma: %v", err)
+	}
+	if journalMode != "wal" {
+		t.Fatalf("journal_mode = %q, want wal", journalMode)
+	}
+
+	var foreignKeys int
+	if err := ix.sql.QueryRow("PRAGMA foreign_keys").Scan(&foreignKeys); err != nil {
+		t.Fatalf("foreign_keys pragma: %v", err)
+	}
+	if foreignKeys != 1 {
+		t.Fatalf("foreign_keys = %d, want 1", foreignKeys)
+	}
+}
+
+func TestConcurrentUpserts(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	errCh := make(chan error, 25)
+	for i := 0; i < 25; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			id := fmt.Sprintf("01CON%03d", i)
+			if err := ix.Upsert(ctx, id+".md", mem(t, id, "Concurrent", "tools", "body")); err != nil {
+				errCh <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatalf("concurrent Upsert: %v", err)
+	}
+	ids, err := ix.ListIDs(ctx)
+	if err != nil {
+		t.Fatalf("ListIDs: %v", err)
+	}
+	if len(ids) != 25 {
+		t.Fatalf("ListIDs returned %d ids, want 25", len(ids))
 	}
 }
 

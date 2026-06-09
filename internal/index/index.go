@@ -34,11 +34,36 @@ func Open(dbPath string) (*Index, error) {
 	if err != nil {
 		return nil, fmt.Errorf("index: opening %s: %w", dbPath, err)
 	}
+	configureSQLite(sqlDB)
+	if err := applyPragmas(sqlDB); err != nil {
+		_ = sqlDB.Close()
+		return nil, err
+	}
 	if err := migrateUp(sqlDB); err != nil {
 		_ = sqlDB.Close()
 		return nil, err
 	}
 	return &Index{sql: sqlDB, q: db.New(sqlDB)}, nil
+}
+
+func configureSQLite(sqlDB *sql.DB) {
+	// SQLite permits one writer at a time. A single shared connection plus a busy
+	// timeout gives local CLI/API/MCP callers predictable serialized writes.
+	sqlDB.SetMaxOpenConns(1)
+}
+
+func applyPragmas(sqlDB *sql.DB) error {
+	pragmas := []string{
+		"PRAGMA busy_timeout = 5000",
+		"PRAGMA journal_mode = WAL",
+		"PRAGMA foreign_keys = ON",
+	}
+	for _, pragma := range pragmas {
+		if _, err := sqlDB.Exec(pragma); err != nil {
+			return fmt.Errorf("index: applying %s: %w", pragma, err)
+		}
+	}
+	return nil
 }
 
 // Close releases the database handle.
