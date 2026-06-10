@@ -54,6 +54,28 @@ export interface MemoryDetail {
   body: string
 }
 
+export interface GraphNode {
+  id: string
+  title: string
+  domain: string
+  importance: number
+  path: string
+  missing: boolean
+}
+
+export interface GraphEdge {
+  id: string
+  source: string
+  target: string
+  type: RelationshipType
+  note?: string
+}
+
+export interface GraphData {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
 export interface MemoryFilter {
   q?: string
   domain?: string

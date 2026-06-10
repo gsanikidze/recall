@@ -4,6 +4,7 @@ import {
   createMemory,
   deleteMemory,
   getMemory,
+  getGraph,
   listDomains,
   updateMemory,
 } from './client'
@@ -88,6 +89,20 @@ describe('api client', () => {
       method: 'POST',
       body: JSON.stringify({ name: 'personal-notes', description: 'Private notes' }),
     }))
+  })
+
+  it('fetches graph data with optional domain filter', async () => {
+    const fetchMock = mockFetch(jsonResponse({
+      nodes: [{ id: '01A', title: 'A', domain: 'tools', importance: 4, path: 'tools/a.md', missing: false }],
+      edges: [{ id: '01A->01B:uses_tool', source: '01A', target: '01B', type: 'uses_tool', note: 'via MCP' }],
+    }))
+
+    await expect(getGraph('tools')).resolves.toEqual({
+      nodes: [{ id: '01A', title: 'A', domain: 'tools', importance: 4, path: 'tools/a.md', missing: false }],
+      edges: [{ id: '01A->01B:uses_tool', source: '01A', target: '01B', type: 'uses_tool', note: 'via MCP' }],
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/graph?domain=tools', expect.any(Object))
   })
 
   it('encodes path params', async () => {

@@ -1,23 +1,25 @@
 import { lazy, Suspense, useState, useCallback } from 'react'
-import { Routes, Route, useParams, useNavigate } from 'react-router-dom'
+import { Routes, Route, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Layout } from '@/components/Layout'
 import { DomainSidebar } from '@/components/DomainSidebar'
 import { MemoryList } from '@/components/MemoryList'
 import { NewDomainDialog } from '@/components/NewDomainDialog'
 import { NewMemoryDialog } from '@/components/NewMemoryDialog'
-import { useDomains, useMemories, useMemory, useReindex, keys } from '@/queries'
+import { useDomains, useMemories, useMemory, useGraph, useReindex, keys } from '@/queries'
 import { useDebounce } from '@/lib/useDebounce'
-import { domainRoute, memoryRoute, routeParam } from '@/lib/routes'
+import { domainRoute, memoryRoute, graphRoute, routeParam } from '@/lib/routes'
 import type { MemoryDetail, MemoryFilter } from '@/api/types'
 
 const MemoryEditor = lazy(() => import('@/components/MemoryEditor').then(module => ({ default: module.MemoryEditor })))
+const GraphView = lazy(() => import('@/components/GraphView').then(module => ({ default: module.GraphView })))
 
 function AppShell() {
   const params = useParams<{ domain?: string; id?: string }>()
   const domain = routeParam(params.domain)
   const id = routeParam(params.id)
   const navigate = useNavigate()
+  const location = useLocation()
   const qc = useQueryClient()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -26,12 +28,14 @@ function AppShell() {
   const [editorDirty, setEditorDirty] = useState(false)
 
   const debouncedQuery = useDebounce(searchQuery, 300)
+  const isGraph = location.pathname === '/graph' || location.pathname.endsWith('/graph')
 
   const { data: domains = [] } = useDomains()
   const memoryFilter: MemoryFilter = { q: debouncedQuery }
   if (domain) memoryFilter.domain = domain
   const { data: memories = [], isLoading } = useMemories(memoryFilter)
-  const { data: selectedMemory } = useMemory(id ?? null)
+  const { data: selectedMemory } = useMemory(!isGraph ? id ?? null : null)
+  const { data: graph = { nodes: [], edges: [] }, isLoading: graphLoading, error: graphError } = useGraph(domain ?? null)
 
   const reindexMutation = useReindex()
 
@@ -85,10 +89,21 @@ function AppShell() {
             onSearchChange={setSearchQuery}
             onSelect={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
             onNew={() => setShowNew(true)}
+            onGraph={() => guardedNavigate(graphRoute(domain ?? null))}
+            graphSelected={isGraph}
           />
         }
         editor={
-          selectedMemory ? (
+          isGraph ? (
+            <Suspense fallback={<div className="flex items-center justify-center h-full text-white/30 text-sm">Loading graph…</div>}>
+              <GraphView
+                graph={graph}
+                loading={graphLoading}
+                error={graphError instanceof Error ? graphError : null}
+                onSelectMemory={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
+              />
+            </Suspense>
+          ) : selectedMemory ? (
             <Suspense fallback={<div className="flex items-center justify-center h-full text-white/30 text-sm">Loading editor…</div>}>
               <MemoryEditor
                 key={selectedMemory.id}
@@ -129,8 +144,10 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<AppShell />} />
+      <Route path="/graph" element={<AppShell />} />
       <Route path="/:id" element={<AppShell />} />
       <Route path="/domains/:domain" element={<AppShell />} />
+      <Route path="/domains/:domain/graph" element={<AppShell />} />
       <Route path="/domains/:domain/:id" element={<AppShell />} />
     </Routes>
   )

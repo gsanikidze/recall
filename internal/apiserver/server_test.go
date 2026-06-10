@@ -158,6 +158,42 @@ func TestMemoryCRUDHappyPath(t *testing.T) {
 	}
 }
 
+func TestGraphEndpointReturnsRelationships(t *testing.T) {
+	e, app := newTestApp(t)
+	ctx := context.Background()
+	target, _, err := e.Add(ctx, recall.AddParams{Title: "Recall project", Body: "project", Domain: "projects"})
+	if err != nil {
+		t.Fatalf("Add target: %v", err)
+	}
+	source, _, err := e.Add(ctx, recall.AddParams{
+		Title:  "Hermes MCP",
+		Body:   "Hermes uses Recall MCP",
+		Domain: "tools",
+		Relationships: []memory.Relationship{{
+			TargetID: target.ID,
+			Type:     memory.RelationshipUsesTool,
+			Note:     "api graph",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Add source: %v", err)
+	}
+
+	resp := doReq(t, app, http.MethodGet, "/api/graph?domain=tools", "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var graph recall.Graph
+	decodeJSON(t, resp, &graph)
+	if len(graph.Nodes) != 2 || len(graph.Edges) != 1 {
+		t.Fatalf("graph = %+v", graph)
+	}
+	edge := graph.Edges[0]
+	if edge.Source != source.ID || edge.Target != target.ID || edge.Type != string(memory.RelationshipUsesTool) || edge.Note != "api graph" {
+		t.Fatalf("edge = %+v", edge)
+	}
+}
+
 func TestInvalidJSONReturns400(t *testing.T) {
 	_, app := newTestApp(t)
 	resp := doReq(t, app, http.MethodPost, "/api/memories", `{`)

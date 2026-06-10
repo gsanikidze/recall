@@ -9,6 +9,7 @@ import {
   createDomain,
   listMemories,
   getMemory,
+  getGraph,
   createMemory,
   updateMemory,
   deleteMemory,
@@ -20,6 +21,7 @@ export const keys = {
   domains: () => ['domains'] as const,
   memories: (filter: MemoryFilter) => ['memories', filter] as const,
   memory: (id: string | null) => ['memory', id] as const,
+  graph: (domain: string | null) => ['graph', domain] as const,
 }
 
 export function useDomains() {
@@ -50,6 +52,14 @@ export function useMemory(id: string | null) {
     queryKey: keys.memory(id),
     queryFn: ({ signal }) => getMemory(id!, signal),
     enabled: !!id,
+  })
+}
+
+export function useGraph(domain: string | null) {
+  return useQuery({
+    queryKey: keys.graph(domain),
+    queryFn: ({ signal }) => getGraph(domain, signal),
+    placeholderData: keepPreviousData,
   })
 }
 

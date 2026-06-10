@@ -220,6 +220,52 @@ func TestUpdateRelationships(t *testing.T) {
 	}
 }
 
+func TestGraphReturnsMemoryRelationships(t *testing.T) {
+	e := newEngine(t)
+	ctx := context.Background()
+
+	target, _, err := e.Add(ctx, AddParams{Title: "Recall project", Body: "project body", Domain: "projects"})
+	if err != nil {
+		t.Fatalf("Add target: %v", err)
+	}
+	source, _, err := e.Add(ctx, AddParams{
+		Title:  "Hermes Recall MCP",
+		Body:   "Hermes uses Recall MCP.",
+		Domain: "tools",
+		Relationships: []memory.Relationship{{
+			TargetID: target.ID,
+			Type:     memory.RelationshipUsesTool,
+			Note:     "stdio MCP",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Add source: %v", err)
+	}
+
+	graph, err := e.Graph(ctx, "")
+	if err != nil {
+		t.Fatalf("Graph: %v", err)
+	}
+	if len(graph.Nodes) != 2 {
+		t.Fatalf("nodes = %+v, want 2", graph.Nodes)
+	}
+	if len(graph.Edges) != 1 {
+		t.Fatalf("edges = %+v, want 1", graph.Edges)
+	}
+	edge := graph.Edges[0]
+	if edge.Source != source.ID || edge.Target != target.ID || edge.Type != string(memory.RelationshipUsesTool) || edge.Note != "stdio MCP" {
+		t.Fatalf("edge = %+v", edge)
+	}
+
+	toolsGraph, err := e.Graph(ctx, "tools")
+	if err != nil {
+		t.Fatalf("Graph tools: %v", err)
+	}
+	if len(toolsGraph.Nodes) != 2 || len(toolsGraph.Edges) != 1 {
+		t.Fatalf("tools graph = %+v, want source plus target placeholder and edge", toolsGraph)
+	}
+}
+
 func TestAddUnknownDomainRejected(t *testing.T) {
 	e := newEngine(t)
 	if _, _, err := e.Add(context.Background(), AddParams{Title: "x", Body: "y", Domain: "nope"}); err == nil {

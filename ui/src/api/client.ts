@@ -1,5 +1,5 @@
 import type {
-  Domain, MemoryHit, MemoryDetail, MemoryFilter,
+  Domain, MemoryHit, MemoryDetail, MemoryFilter, GraphData,
   CreateDomainParams, CreateMemoryParams, UpdateMemoryParams,
 } from './types'
 
@@ -61,6 +61,13 @@ export async function listMemories(filter: MemoryFilter = {}, signal?: AbortSign
 
 export async function getMemory(id: string, signal?: AbortSignal): Promise<MemoryDetail> {
   return request<MemoryDetail>(`/api/memories/${encodePathParam(id)}`, initWithSignal(signal))
+}
+
+export async function getGraph(domain?: string | null, signal?: AbortSignal): Promise<GraphData> {
+  const params = new URLSearchParams()
+  if (domain) params.set('domain', domain)
+  const qs = params.toString()
+  return request<GraphData>(`/api/graph${qs ? `?${qs}` : ''}`, initWithSignal(signal))
 }
 
 export async function createMemory(params: CreateMemoryParams): Promise<{ id: string; path: string }> {

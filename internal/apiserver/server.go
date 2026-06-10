@@ -40,6 +40,7 @@ func New(e *recall.Engine) *fiber.App {
 
 	api.Get("/domains", s.listDomains)
 	api.Post("/domains", s.createDomain)
+	api.Get("/graph", s.getGraph)
 	api.Get("/memories", s.listMemories)
 	api.Get("/memories/:id", s.getMemory)
 	api.Post("/memories", s.createMemory)
@@ -118,6 +119,14 @@ func (s *server) createDomain(c *fiber.Ctx) error {
 		description = "(no description)"
 	}
 	return c.Status(fiber.StatusCreated).JSON(domainJSON{Name: name, Description: description})
+}
+
+func (s *server) getGraph(c *fiber.Ctx) error {
+	graph, err := s.engine.Graph(c.Context(), c.Query("domain"))
+	if err != nil {
+		return errResp(c, err)
+	}
+	return c.JSON(graph)
 }
 
 func (s *server) listMemories(c *fiber.Ctx) error {

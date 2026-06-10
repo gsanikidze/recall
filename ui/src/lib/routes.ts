@@ -6,6 +6,10 @@ export function domainRoute(domain: string | null): string {
   return domain ? `/domains/${encodeURIComponent(domain)}` : '/'
 }
 
+export function graphRoute(domain: string | null): string {
+  return domain ? `${domainRoute(domain)}/graph` : '/graph'
+}
+
 export function memoryRoute(domain: string | null, id: string): string {
   const encodedId = encodeURIComponent(id)
   return domain ? `${domainRoute(domain)}/${encodedId}` : `/${encodedId}`

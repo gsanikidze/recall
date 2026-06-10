@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"recall/internal/index"
 	"recall/internal/memory"
@@ -154,9 +155,100 @@ func (e *Engine) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// GraphNode is one memory vertex for graph visualization.
+type GraphNode struct {
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	Domain     string `json:"domain"`
+	Importance int    `json:"importance"`
+	Path       string `json:"path"`
+	Missing    bool   `json:"missing"`
+}
+
+// GraphEdge is one typed directed relationship between memories.
+type GraphEdge struct {
+	ID     string `json:"id"`
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Type   string `json:"type"`
+	Note   string `json:"note,omitempty"`
+}
+
+// Graph is the relationship graph returned to UI/API clients.
+type Graph struct {
+	Nodes []GraphNode `json:"nodes"`
+	Edges []GraphEdge `json:"edges"`
+}
+
 // Search runs a filtered, ranked query against the index.
 func (e *Engine) Search(ctx context.Context, f index.Filter) ([]index.Hit, error) {
 	return e.index.Search(ctx, f)
+}
+
+// Graph returns typed relationships as a node/edge graph. If domain is set,
+// only edges whose source memory is in that domain are included; their targets
+// are still included so the relationship remains visible.
+func (e *Engine) Graph(ctx context.Context, domain string) (Graph, error) {
+	ids, err := e.index.ListIDs(ctx)
+	if err != nil {
+		return Graph{}, err
+	}
+	sort.Strings(ids)
+
+	type loadedMemory struct {
+		memory.Memory
+		Path string
+	}
+	loaded := make(map[string]loadedMemory, len(ids))
+	for _, id := range ids {
+		m, relPath, err := e.Get(ctx, id)
+		if err != nil {
+			return Graph{}, err
+		}
+		loaded[id] = loadedMemory{Memory: m, Path: relPath}
+	}
+
+	nodesByID := map[string]GraphNode{}
+	edges := []GraphEdge{}
+	addNode := func(id string) {
+		if _, ok := nodesByID[id]; ok {
+			return
+		}
+		if item, ok := loaded[id]; ok {
+			nodesByID[id] = GraphNode{
+				ID: item.ID, Title: item.Title, Domain: item.Domain,
+				Importance: item.Importance, Path: item.Path,
+			}
+			return
+		}
+		nodesByID[id] = GraphNode{ID: id, Title: id, Domain: "missing", Missing: true}
+	}
+
+	for _, id := range ids {
+		item := loaded[id]
+		if domain != "" && item.Domain != domain {
+			continue
+		}
+		addNode(item.ID)
+		for _, rel := range item.Relationships {
+			addNode(rel.TargetID)
+			edges = append(edges, GraphEdge{
+				ID:     item.ID + "->" + rel.TargetID + ":" + string(rel.Type),
+				Source: item.ID,
+				Target: rel.TargetID,
+				Type:   string(rel.Type),
+				Note:   rel.Note,
+			})
+		}
+	}
+
+	nodes := make([]GraphNode, 0, len(nodesByID))
+	for _, node := range nodesByID {
+		nodes = append(nodes, node)
+	}
+	sort.Slice(nodes, func(i, j int) bool { return nodes[i].ID < nodes[j].ID })
+	sort.Slice(edges, func(i, j int) bool { return edges[i].ID < edges[j].ID })
+	return Graph{Nodes: nodes, Edges: edges}, nil
 }
 
 // MemoryCount returns the number of indexed memories.

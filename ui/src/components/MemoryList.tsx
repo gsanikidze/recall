@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { Plus, Network } from 'lucide-react'
 import { MemoryCard } from './MemoryCard'
 import { SearchBar } from './SearchBar'
 import type { MemoryHit } from '@/api/types'
@@ -11,11 +11,13 @@ interface Props {
   onSearchChange: (q: string) => void
   onSelect: (id: string) => void
   onNew: () => void
+  onGraph: () => void
+  graphSelected?: boolean
 }
 
 export function MemoryList({
   memories, loading, selectedId, searchQuery,
-  onSearchChange, onSelect, onNew,
+  onSearchChange, onSelect, onNew, onGraph, graphSelected = false,
 }: Props) {
   return (
     <div className="flex flex-col h-full border-r border-white/5">
@@ -24,6 +26,12 @@ export function MemoryList({
         <div className="flex-1">
           <SearchBar value={searchQuery} onChange={onSearchChange} />
         </div>
+        <button
+          onClick={onGraph}
+          className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-2 text-xs font-medium rounded-lg transition-colors ${graphSelected ? 'bg-white/15 text-white' : 'bg-white/5 hover:bg-white/10 text-white/70'}`}
+        >
+          <Network className="w-3.5 h-3.5" /> Graph
+        </button>
         <button
           onClick={onNew}
           className="flex-shrink-0 flex items-center gap-1 px-2.5 py-2 text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors"
