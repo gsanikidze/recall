@@ -4,12 +4,15 @@ package apiserver
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	fibercors "github.com/gofiber/fiber/v2/middleware/cors"
 
+	"recall/internal/embedding"
 	"recall/internal/index"
 	"recall/internal/memory"
 	"recall/internal/recall"
@@ -61,13 +64,15 @@ type domainJSON struct {
 }
 
 type hitJSON struct {
-	ID         string  `json:"id"`
-	Title      string  `json:"title"`
-	Domain     string  `json:"domain"`
-	Snippet    string  `json:"snippet"`
-	Path       string  `json:"path"`
-	Importance int     `json:"importance"`
-	Score      float64 `json:"score"`
+	ID            string  `json:"id"`
+	Title         string  `json:"title"`
+	Domain        string  `json:"domain"`
+	Snippet       string  `json:"snippet"`
+	Path          string  `json:"path"`
+	Importance    int     `json:"importance"`
+	Score         float64 `json:"score"`
+	KeywordScore  float64 `json:"keyword_score,omitempty"`
+	SemanticScore float64 `json:"semantic_score,omitempty"`
 }
 
 type memoryJSON struct {
@@ -140,7 +145,11 @@ func (s *server) listMemories(c *fiber.Ctx) error {
 			tags = append(tags, p)
 		}
 	}
-	hits, err := s.engine.Search(c.Context(), index.Filter{
+	mode, err := parseSearchMode(c.Query("mode", "keyword"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	filter := index.Filter{
 		Query:          c.Query("q"),
 		Domain:         c.Query("domain"),
 		Tags:           tags,
@@ -150,13 +159,34 @@ func (s *server) listMemories(c *fiber.Ctx) error {
 		Until:          c.Query("until"),
 		IncludeExpired: c.QueryBool("include_expired"),
 		Limit:          limit,
-	})
+		Mode:           mode,
+	}
+	if mode == index.SearchModeSemantic || mode == index.SearchModeHybrid {
+		providerName := strings.TrimSpace(c.Query("provider", "ollama"))
+		model := strings.TrimSpace(c.Query("model", embedding.DefaultOllamaModel))
+		baseURL := strings.TrimSpace(c.Query("base_url", os.Getenv("RECALL_OLLAMA_URL")))
+		provider, err := apiEmbeddingProvider(providerName, model, baseURL)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		vectors, err := provider.Embed(c.Context(), []string{filter.Query})
+		if err != nil {
+			return errResp(c, err)
+		}
+		if len(vectors) != 1 {
+			return errResp(c, fmt.Errorf("api: provider returned %d query vectors, want 1", len(vectors)))
+		}
+		filter.QueryVector = vectors[0]
+		filter.Provider = provider.Name()
+		filter.Model = provider.Model()
+	}
+	hits, err := s.engine.Search(c.Context(), filter)
 	if err != nil {
 		return validationOrErrResp(c, err)
 	}
 	out := make([]hitJSON, len(hits))
 	for i, h := range hits {
-		out[i] = hitJSON{ID: h.ID, Title: h.Title, Domain: h.Domain, Snippet: h.Snippet, Path: h.Path, Importance: h.Importance, Score: h.Score}
+		out[i] = hitJSON{ID: h.ID, Title: h.Title, Domain: h.Domain, Snippet: h.Snippet, Path: h.Path, Importance: h.Importance, Score: h.Score, KeywordScore: h.KeywordScore, SemanticScore: h.SemanticScore}
 	}
 	return c.JSON(fiber.Map{"memories": out})
 }
@@ -252,6 +282,33 @@ func (s *server) reindex(c *fiber.Ctx) error {
 }
 
 // ---- helpers ----
+
+func parseSearchMode(raw string) (index.SearchMode, error) {
+	switch strings.TrimSpace(raw) {
+	case "", "keyword":
+		return index.SearchModeKeyword, nil
+	case "semantic":
+		return index.SearchModeSemantic, nil
+	case "hybrid":
+		return index.SearchModeHybrid, nil
+	default:
+		return "", fmt.Errorf("api: unknown search mode %q", raw)
+	}
+}
+
+func apiEmbeddingProvider(name, model, baseURL string) (embedding.Provider, error) {
+	if model == "" {
+		return nil, fmt.Errorf("api: model is required")
+	}
+	switch name {
+	case "ollama":
+		return embedding.NewOllamaProvider(baseURL, model), nil
+	case "fake":
+		return embedding.NewFakeProvider(model, 32), nil
+	default:
+		return nil, fmt.Errorf("api: unknown provider %q", name)
+	}
+}
 
 func toMemoryJSON(m memory.Memory, relPath string) memoryJSON {
 	tags := m.Tags

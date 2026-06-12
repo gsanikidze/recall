@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
 
+	"recall/internal/embedding"
 	"recall/internal/memory"
 	"recall/internal/recall"
 )
@@ -155,6 +157,55 @@ func TestMemoryCRUDHappyPath(t *testing.T) {
 	deleteResp := doReq(t, app, http.MethodDelete, "/api/memories/"+created.ID, "")
 	if deleteResp.StatusCode != http.StatusNoContent {
 		t.Fatalf("delete status = %d, want 204", deleteResp.StatusCode)
+	}
+}
+
+func TestSemanticMemorySearchEndpoint(t *testing.T) {
+	e, app := newTestApp(t)
+	ctx := context.Background()
+	if _, _, err := e.Add(ctx, recall.AddParams{Title: "Phone Sync", Body: "iPhone Obsidian setup", Domain: "tools"}); err != nil {
+		t.Fatalf("Add phone: %v", err)
+	}
+	if _, _, err := e.Add(ctx, recall.AddParams{Title: "Recall Policy", Body: "local first memory policy", Domain: "decisions"}); err != nil {
+		t.Fatalf("Add policy: %v", err)
+	}
+	if _, err := e.EmbedAll(ctx, embedding.NewFakeProvider("fake-32", 32), false); err != nil {
+		t.Fatalf("EmbedAll: %v", err)
+	}
+
+	resp := doReq(t, app, http.MethodGet, "/api/memories?q=phone%20sync&mode=semantic&provider=fake&model=fake-32", "")
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("semantic status = %d, want 200 body=%s", resp.StatusCode, body)
+	}
+	var semantic struct {
+		Memories []hitJSON `json:"memories"`
+	}
+	decodeJSON(t, resp, &semantic)
+	if len(semantic.Memories) == 0 || semantic.Memories[0].SemanticScore == 0 || !strings.Contains(semantic.Memories[0].Title, "Phone") {
+		t.Fatalf("semantic memories = %+v", semantic.Memories)
+	}
+
+	resp = doReq(t, app, http.MethodGet, "/api/memories?q=phone%20sync&mode=hybrid&provider=fake&model=fake-32", "")
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("hybrid status = %d, want 200 body=%s", resp.StatusCode, body)
+	}
+	var hybrid struct {
+		Memories []hitJSON `json:"memories"`
+	}
+	decodeJSON(t, resp, &hybrid)
+	if len(hybrid.Memories) == 0 || hybrid.Memories[0].SemanticScore == 0 || !strings.Contains(hybrid.Memories[0].Title, "Phone") {
+		t.Fatalf("hybrid memories = %+v", hybrid.Memories)
+	}
+}
+
+func TestMemorySearchEndpointRejectsUnknownMode(t *testing.T) {
+	_, app := newTestApp(t)
+	resp := doReq(t, app, http.MethodGet, "/api/memories?q=phone&mode=weird", "")
+	if resp.StatusCode != http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 400 body=%s", resp.StatusCode, body)
 	}
 }
 
