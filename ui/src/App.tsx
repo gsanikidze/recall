@@ -81,17 +81,19 @@ function AppShell() {
           />
         }
         list={
-          <MemoryList
-            memories={memories}
-            loading={isLoading}
-            selectedId={id ?? null}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onSelect={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
-            onNew={() => setShowNew(true)}
-            onGraph={() => guardedNavigate(graphRoute(domain ?? null))}
-            graphSelected={isGraph}
-          />
+          isGraph ? null : (
+            <MemoryList
+              memories={memories}
+              loading={isLoading}
+              selectedId={id ?? null}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onSelect={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
+              onNew={() => setShowNew(true)}
+              onGraph={() => guardedNavigate(graphRoute(domain ?? null))}
+              graphSelected={isGraph}
+            />
+          )
         }
         editor={
           isGraph ? (

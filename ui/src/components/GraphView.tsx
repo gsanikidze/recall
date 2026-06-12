@@ -1,6 +1,6 @@
-import { ReactFlow, Background, Controls, MiniMap, type Edge, type Node } from '@xyflow/react'
+import { ReactFlow, Background, Controls, Handle, Position, type Edge, type Node, type NodeProps } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { GraphData, GraphNode } from '@/api/types'
+import type { GraphData, GraphEdge } from '@/api/types'
 
 interface Props {
   graph: GraphData
@@ -16,33 +16,89 @@ interface NodeData extends Record<string, unknown> {
   missing: boolean
 }
 
-function nodePosition(index: number) {
-  const columns = 3
+type MemoryNode = Node<NodeData, 'memory'>
+
+const domainColor: Record<string, string> = {
+  people: '#a78bfa',
+  projects: '#38bdf8',
+  decisions: '#fbbf24',
+  tools: '#34d399',
+  goals: '#fb7185',
+  research: '#c084fc',
+  inbox: '#94a3b8',
+}
+
+function edgeCounts(edges: GraphEdge[]) {
+  const counts = new Map<string, number>()
+  for (const edge of edges) {
+    counts.set(edge.source, (counts.get(edge.source) ?? 0) + 1)
+    counts.set(edge.target, (counts.get(edge.target) ?? 0) + 1)
+  }
+  return counts
+}
+
+function nodePosition(index: number, total: number) {
+  if (index === 0) return { x: 0, y: 0 }
+
+  const ringIndex = index - 1
+  const outerCount = Math.max(total - 1, 1)
+  const angle = (ringIndex / outerCount) * Math.PI * 2 - Math.PI / 2
+  const radiusX = Math.max(420, outerCount * 48)
+  const radiusY = 280
+
   return {
-    x: (index % columns) * 260,
-    y: Math.floor(index / columns) * 180,
+    x: Math.round(Math.cos(angle) * radiusX),
+    y: Math.round(Math.sin(angle) * radiusY),
   }
 }
 
-function toFlowNode(node: GraphNode, index: number): Node<NodeData> {
-  return {
-    id: node.id,
-    position: nodePosition(index),
-    data: {
-      label: node.title,
-      domain: node.domain,
-      importance: node.importance,
-      missing: node.missing,
-    },
-    className: node.missing
-      ? 'rounded-xl border border-dashed border-red-400/50 bg-red-950/40 text-red-100 px-3 py-2 text-sm shadow-lg'
-      : 'rounded-xl border border-violet-400/40 bg-[#181225] text-white px-3 py-2 text-sm shadow-lg',
-  }
+function toFlowNodes(graph: GraphData): MemoryNode[] {
+  const counts = edgeCounts(graph.edges)
+  return [...graph.nodes]
+    .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) || a.title.localeCompare(b.title))
+    .map((node, index, nodes) => ({
+      id: node.id,
+      type: 'memory',
+      position: nodePosition(index, nodes.length),
+      data: {
+        label: node.title,
+        domain: node.domain,
+        importance: node.importance,
+        missing: node.missing,
+      },
+      draggable: true,
+    }))
 }
 
-function edgeLabel(type: string, note?: string) {
-  return note ? `${type} — ${note}` : type
+function edgeLabel(type: string) {
+  return type
 }
+
+function MemoryGraphNode({ data }: NodeProps<MemoryNode>) {
+  const color = domainColor[data.domain] ?? '#8b5cf6'
+  return (
+    <div
+      className="w-56 rounded-2xl border bg-[#15111f]/95 px-4 py-3 text-left shadow-2xl shadow-black/40 backdrop-blur"
+      style={{ borderColor: `${color}99` }}
+    >
+      <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-0" style={{ background: color }} />
+      <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !border-0" style={{ background: color }} />
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span
+          className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-black"
+          style={{ background: color }}
+        >
+          {data.domain}
+        </span>
+        <span className="text-[10px] text-white/35">★ {data.importance}</span>
+      </div>
+      <div className="line-clamp-2 text-sm font-semibold leading-snug text-white">{data.label}</div>
+      {data.missing && <div className="mt-2 text-[11px] text-red-300">Missing target</div>}
+    </div>
+  )
+}
+
+const nodeTypes = { memory: MemoryGraphNode }
 
 export function GraphView({ graph, loading, error, onSelectMemory }: Props) {
   if (loading) {
@@ -60,16 +116,19 @@ export function GraphView({ graph, loading, error, onSelectMemory }: Props) {
     )
   }
 
-  const nodes: Node<NodeData>[] = graph.nodes.map(toFlowNode)
+  const nodes = toFlowNodes(graph)
   const edges: Edge[] = graph.edges.map(edge => ({
     id: edge.id,
     source: edge.source,
     target: edge.target,
-    label: edgeLabel(edge.type, edge.note),
+    label: edgeLabel(edge.type),
     animated: edge.type === 'uses_tool' || edge.type === 'depends_on',
-    className: 'text-violet-200',
-    labelStyle: { fill: '#ddd6fe', fontSize: 11, fontWeight: 600 },
-    style: { stroke: '#8b5cf6', strokeWidth: 2 },
+    type: 'smoothstep',
+    labelBgPadding: [6, 3],
+    labelBgBorderRadius: 999,
+    labelBgStyle: { fill: '#171322', fillOpacity: 0.92 },
+    labelStyle: { fill: '#c4b5fd', fontSize: 10, fontWeight: 700 },
+    style: { stroke: '#7c3aed', strokeWidth: 1.6, opacity: 0.68 },
   }))
 
   return (
@@ -82,15 +141,19 @@ export function GraphView({ graph, loading, error, onSelectMemory }: Props) {
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          nodeTypes={nodeTypes}
           fitView
+          fitViewOptions={{ padding: 0.22 }}
+          minZoom={0.25}
+          maxZoom={1.5}
+          proOptions={{ hideAttribution: true }}
           onNodeClick={(_, node) => {
             const data = node.data as NodeData
             if (!data.missing) onSelectMemory(node.id)
           }}
         >
-          <MiniMap pannable zoomable />
-          <Controls />
-          <Background />
+          <Controls showInteractive={false} />
+          <Background color="#312447" gap={28} size={1} />
         </ReactFlow>
       </div>
     </div>

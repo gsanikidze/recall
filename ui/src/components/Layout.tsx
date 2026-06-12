@@ -13,7 +13,7 @@ export function Layout({ sidebar, list, editor }: Props) {
       <div className="w-48 flex-shrink-0 flex flex-col">{sidebar}</div>
 
       {/* Memory list */}
-      <div className="w-72 flex-shrink-0 flex flex-col">{list}</div>
+      {list && <div data-testid="memory-list-pane" className="w-72 flex-shrink-0 flex flex-col">{list}</div>}
 
       {/* Editor */}
       <div className="flex-1 flex flex-col overflow-hidden">{editor}</div>

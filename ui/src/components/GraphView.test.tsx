@@ -11,8 +11,9 @@ vi.mock('@xyflow/react', () => {
     nodes: MockNode[]
     edges: MockEdge[]
     onNodeClick?: (event: unknown, node: MockNode) => void
+    children?: React.ReactNode
   }
-  const ReactFlow = ({ nodes, edges, onNodeClick }: MockReactFlowProps) => (
+  const ReactFlow = ({ nodes, edges, onNodeClick, children }: MockReactFlowProps) => (
     <div data-testid="react-flow">
       {nodes.map((node) => (
         <button key={node.id} onClick={() => onNodeClick?.({}, node)}>
@@ -22,6 +23,7 @@ vi.mock('@xyflow/react', () => {
       {edges.map((edge) => (
         <div key={edge.id}>{edge.label}</div>
       ))}
+      {children}
     </div>
   )
   return {
@@ -44,13 +46,20 @@ const graph: GraphData = {
 }
 
 describe('GraphView', () => {
-  it('renders graph nodes and typed relationship labels', () => {
+  it('renders graph nodes and concise relationship type labels', () => {
     render(<GraphView graph={graph} loading={false} onSelectMemory={vi.fn()} />)
 
     expect(screen.getByTestId('react-flow')).toBeInTheDocument()
     expect(screen.getByText(/Hermes MCP tools importance 5/i)).toBeInTheDocument()
     expect(screen.getByText(/Recall project projects importance 4/i)).toBeInTheDocument()
-    expect(screen.getByText(/uses_tool — stdio MCP/i)).toBeInTheDocument()
+    expect(screen.getByText('uses_tool')).toBeInTheDocument()
+    expect(screen.queryByText(/stdio MCP/i)).not.toBeInTheDocument()
+  })
+
+  it('does not render the minimap because it covers small graphs', () => {
+    render(<GraphView graph={graph} loading={false} onSelectMemory={vi.fn()} />)
+
+    expect(screen.queryByTestId('minimap')).not.toBeInTheDocument()
   })
 
   it('selects non-missing memory nodes', async () => {
