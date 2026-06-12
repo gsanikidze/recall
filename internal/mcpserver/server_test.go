@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"recall/internal/embedding"
 	"recall/internal/index"
 	"recall/internal/memory"
 	"recall/internal/recall"
@@ -16,6 +17,12 @@ import (
 // startTestServer wires a fresh engine to an MCP server over an in-memory
 // transport and returns a connected client session.
 func startTestServer(t *testing.T) *mcp.ClientSession {
+	t.Helper()
+	_, session := startTestServerWithEngine(t)
+	return session
+}
+
+func startTestServerWithEngine(t *testing.T) (*recall.Engine, *mcp.ClientSession) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -41,7 +48,7 @@ func startTestServer(t *testing.T) *mcp.ClientSession {
 		t.Fatalf("client.Connect: %v", err)
 	}
 	t.Cleanup(func() { _ = session.Close() })
-	return session
+	return e, session
 }
 
 // call invokes a tool and decodes its JSON text result into out.
@@ -166,6 +173,38 @@ func TestMCPAddSearchGetFlow(t *testing.T) {
 	if len(search2.Hits) != 1 || search2.Hits[0].Importance != 4 {
 		t.Fatalf("search after update = %+v", search2)
 	}
+}
+
+func TestMCPSemanticAndHybridSearchModes(t *testing.T) {
+	e, s := startTestServerWithEngine(t)
+	ctx := context.Background()
+	phone, _, err := e.Add(ctx, recall.AddParams{Title: "Phone Sync", Body: "iPhone Obsidian setup", Domain: "tools"})
+	if err != nil {
+		t.Fatalf("Add phone: %v", err)
+	}
+	if _, _, err := e.Add(ctx, recall.AddParams{Title: "Recall Policy", Body: "local first memory policy", Domain: "decisions"}); err != nil {
+		t.Fatalf("Add policy: %v", err)
+	}
+	if _, err := e.EmbedAll(ctx, embedding.NewFakeProvider("fake-32", 32), false); err != nil {
+		t.Fatalf("EmbedAll: %v", err)
+	}
+
+	var semantic searchOut
+	call(t, s, "recall_search", map[string]any{"query": "phone sync", "mode": "semantic", "provider": "fake", "model": "fake-32"}, &semantic)
+	if len(semantic.Hits) == 0 || semantic.Hits[0].ID != phone.ID || semantic.Hits[0].SemanticScore == 0 {
+		t.Fatalf("semantic search = %+v", semantic)
+	}
+
+	var hybrid searchOut
+	call(t, s, "recall_search", map[string]any{"query": "phone sync", "mode": "hybrid", "provider": "fake", "model": "fake-32"}, &hybrid)
+	if len(hybrid.Hits) == 0 || hybrid.Hits[0].ID != phone.ID || hybrid.Hits[0].SemanticScore == 0 {
+		t.Fatalf("hybrid search = %+v", hybrid)
+	}
+}
+
+func TestMCPSearchRejectsUnknownMode(t *testing.T) {
+	s := startTestServer(t)
+	callExpectError(t, s, "recall_search", map[string]any{"query": "phone", "mode": "weird"}, "mode")
 }
 
 func TestMCPAddRejectsUnknownDomain(t *testing.T) {
