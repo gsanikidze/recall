@@ -34,6 +34,81 @@ func mem(t *testing.T, id, title, domain, body string) memory.Memory {
 	}
 }
 
+func TestEmbeddingStorageRoundTrip(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	m := mem(t, "01EMB", "Vector memory", "tools", "embedding body")
+	if err := ix.Upsert(ctx, "tools/vector.md", m); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	want := Embedding{
+		MemoryID:    "01EMB",
+		Provider:    "fake",
+		Model:       "fake-8",
+		Dim:         3,
+		Vector:      []float32{0.25, 0.5, 1},
+		ContentHash: "hash-1",
+	}
+	if err := ix.UpsertEmbedding(ctx, want); err != nil {
+		t.Fatalf("UpsertEmbedding: %v", err)
+	}
+
+	got, err := ix.EmbeddingForMemory(ctx, "01EMB", "fake", "fake-8")
+	if err != nil {
+		t.Fatalf("EmbeddingForMemory: %v", err)
+	}
+	assertEmbeddingEqual(t, got, want)
+
+	all, err := ix.Embeddings(ctx, "fake", "fake-8")
+	if err != nil {
+		t.Fatalf("Embeddings: %v", err)
+	}
+	if len(all) != 1 {
+		t.Fatalf("got %d embeddings, want 1", len(all))
+	}
+	assertEmbeddingEqual(t, all[0], want)
+}
+
+func TestEmbeddingDeletedWithMemory(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	m := mem(t, "01DEL", "Deleted vector memory", "tools", "embedding body")
+	if err := ix.Upsert(ctx, "tools/deleted-vector.md", m); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	if err := ix.UpsertEmbedding(ctx, Embedding{
+		MemoryID: "01DEL", Provider: "fake", Model: "fake-8", Dim: 2,
+		Vector: []float32{1, 0}, ContentHash: "hash-2",
+	}); err != nil {
+		t.Fatalf("UpsertEmbedding: %v", err)
+	}
+	if err := ix.Delete(ctx, "01DEL"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+
+	if _, err := ix.EmbeddingForMemory(ctx, "01DEL", "fake", "fake-8"); err == nil {
+		t.Fatal("EmbeddingForMemory succeeded after memory delete")
+	}
+}
+
+func assertEmbeddingEqual(t *testing.T, got, want Embedding) {
+	t.Helper()
+	if got.MemoryID != want.MemoryID || got.Provider != want.Provider || got.Model != want.Model || got.Dim != want.Dim || got.ContentHash != want.ContentHash {
+		t.Fatalf("embedding metadata = %+v, want %+v", got, want)
+	}
+	if len(got.Vector) != len(want.Vector) {
+		t.Fatalf("vector len = %d, want %d", len(got.Vector), len(want.Vector))
+	}
+	for i := range want.Vector {
+		if got.Vector[i] != want.Vector[i] {
+			t.Fatalf("vector[%d] = %v, want %v", i, got.Vector[i], want.Vector[i])
+		}
+	}
+}
+
 func TestUpsertAndFullTextSearch(t *testing.T) {
 	ix := openIndex(t)
 	ctx := context.Background()

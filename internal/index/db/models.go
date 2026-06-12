@@ -30,6 +30,16 @@ type Memory struct {
 	Body       string
 }
 
+type MemoryEmbedding struct {
+	MemoryID    string
+	Provider    string
+	Model       string
+	Dim         int64
+	Vector      []byte
+	ContentHash string
+	EmbeddedAt  string
+}
+
 type MemoryRelationship struct {
 	SourceID string
 	TargetID string

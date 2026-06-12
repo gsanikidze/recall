@@ -9,6 +9,21 @@ import (
 	"context"
 )
 
+const deleteEmbeddingForMemory = `-- name: DeleteEmbeddingForMemory :exec
+DELETE FROM memory_embeddings WHERE memory_id = ? AND provider = ? AND model = ?
+`
+
+type DeleteEmbeddingForMemoryParams struct {
+	MemoryID string
+	Provider string
+	Model    string
+}
+
+func (q *Queries) DeleteEmbeddingForMemory(ctx context.Context, arg DeleteEmbeddingForMemoryParams) error {
+	_, err := q.db.ExecContext(ctx, deleteEmbeddingForMemory, arg.MemoryID, arg.Provider, arg.Model)
+	return err
+}
+
 const deleteFTSForMemory = `-- name: DeleteFTSForMemory :exec
 DELETE FROM memories_fts WHERE id = ?
 `
@@ -66,6 +81,33 @@ DELETE FROM tags WHERE memory_id = ?
 func (q *Queries) DeleteTagsForMemory(ctx context.Context, memoryID string) error {
 	_, err := q.db.ExecContext(ctx, deleteTagsForMemory, memoryID)
 	return err
+}
+
+const getEmbeddingForMemory = `-- name: GetEmbeddingForMemory :one
+SELECT memory_id, provider, model, dim, vector, content_hash, embedded_at
+FROM memory_embeddings
+WHERE memory_id = ? AND provider = ? AND model = ?
+`
+
+type GetEmbeddingForMemoryParams struct {
+	MemoryID string
+	Provider string
+	Model    string
+}
+
+func (q *Queries) GetEmbeddingForMemory(ctx context.Context, arg GetEmbeddingForMemoryParams) (MemoryEmbedding, error) {
+	row := q.db.QueryRowContext(ctx, getEmbeddingForMemory, arg.MemoryID, arg.Provider, arg.Model)
+	var i MemoryEmbedding
+	err := row.Scan(
+		&i.MemoryID,
+		&i.Provider,
+		&i.Model,
+		&i.Dim,
+		&i.Vector,
+		&i.ContentHash,
+		&i.EmbeddedAt,
+	)
+	return i, err
 }
 
 const getLinksForMemory = `-- name: GetLinksForMemory :many
@@ -243,6 +285,49 @@ func (q *Queries) InsertTag(ctx context.Context, arg InsertTagParams) error {
 	return err
 }
 
+const listEmbeddingsForModel = `-- name: ListEmbeddingsForModel :many
+SELECT memory_id, provider, model, dim, vector, content_hash, embedded_at
+FROM memory_embeddings
+WHERE provider = ? AND model = ?
+ORDER BY memory_id
+`
+
+type ListEmbeddingsForModelParams struct {
+	Provider string
+	Model    string
+}
+
+func (q *Queries) ListEmbeddingsForModel(ctx context.Context, arg ListEmbeddingsForModelParams) ([]MemoryEmbedding, error) {
+	rows, err := q.db.QueryContext(ctx, listEmbeddingsForModel, arg.Provider, arg.Model)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MemoryEmbedding{}
+	for rows.Next() {
+		var i MemoryEmbedding
+		if err := rows.Scan(
+			&i.MemoryID,
+			&i.Provider,
+			&i.Model,
+			&i.Dim,
+			&i.Vector,
+			&i.ContentHash,
+			&i.EmbeddedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMemoryIDs = `-- name: ListMemoryIDs :many
 SELECT id FROM memories
 `
@@ -268,6 +353,37 @@ func (q *Queries) ListMemoryIDs(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertEmbedding = `-- name: UpsertEmbedding :exec
+INSERT INTO memory_embeddings (memory_id, provider, model, dim, vector, content_hash, embedded_at)
+VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+ON CONFLICT(memory_id, provider, model) DO UPDATE SET
+    dim = excluded.dim,
+    vector = excluded.vector,
+    content_hash = excluded.content_hash,
+    embedded_at = excluded.embedded_at
+`
+
+type UpsertEmbeddingParams struct {
+	MemoryID    string
+	Provider    string
+	Model       string
+	Dim         int64
+	Vector      []byte
+	ContentHash string
+}
+
+func (q *Queries) UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error {
+	_, err := q.db.ExecContext(ctx, upsertEmbedding,
+		arg.MemoryID,
+		arg.Provider,
+		arg.Model,
+		arg.Dim,
+		arg.Vector,
+		arg.ContentHash,
+	)
+	return err
 }
 
 const upsertMemory = `-- name: UpsertMemory :exec

@@ -63,3 +63,26 @@ DELETE FROM memories_fts WHERE id = ?;
 
 -- name: InsertFTSForMemory :exec
 INSERT INTO memories_fts (id, title, body) VALUES (?, ?, ?);
+
+-- name: UpsertEmbedding :exec
+INSERT INTO memory_embeddings (memory_id, provider, model, dim, vector, content_hash, embedded_at)
+VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+ON CONFLICT(memory_id, provider, model) DO UPDATE SET
+    dim = excluded.dim,
+    vector = excluded.vector,
+    content_hash = excluded.content_hash,
+    embedded_at = excluded.embedded_at;
+
+-- name: GetEmbeddingForMemory :one
+SELECT memory_id, provider, model, dim, vector, content_hash, embedded_at
+FROM memory_embeddings
+WHERE memory_id = ? AND provider = ? AND model = ?;
+
+-- name: ListEmbeddingsForModel :many
+SELECT memory_id, provider, model, dim, vector, content_hash, embedded_at
+FROM memory_embeddings
+WHERE provider = ? AND model = ?
+ORDER BY memory_id;
+
+-- name: DeleteEmbeddingForMemory :exec
+DELETE FROM memory_embeddings WHERE memory_id = ? AND provider = ? AND model = ?;

@@ -40,6 +40,17 @@ CREATE TABLE memory_relationships (
     PRIMARY KEY (source_id, target_id, type)
 );
 
+CREATE TABLE memory_embeddings (
+    memory_id    TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    provider     TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    dim          INTEGER NOT NULL,
+    vector       BLOB NOT NULL,
+    content_hash TEXT NOT NULL,
+    embedded_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (memory_id, provider, model)
+);
+
 CREATE TABLE memories_fts (
     id    TEXT PRIMARY KEY,
     title TEXT NOT NULL,
