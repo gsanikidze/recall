@@ -243,6 +243,27 @@ func searchEmbeddingProvider(args searchArgs) (embedding.Provider, error) {
 	}
 }
 
+func parseSearchMode(raw string) (index.SearchMode, error) {
+	switch strings.TrimSpace(raw) {
+	case "", "keyword":
+		return index.SearchModeKeyword, nil
+	case "semantic":
+		return index.SearchModeSemantic, nil
+	case "hybrid":
+		return index.SearchModeHybrid, nil
+	default:
+		return "", fmt.Errorf("search: unknown mode %q", raw)
+	}
+}
+
+func setSearchMode(current *index.SearchMode, next index.SearchMode) error {
+	if *current != "" && *current != next {
+		return fmt.Errorf("search: --mode, --semantic, and --hybrid are mutually exclusive")
+	}
+	*current = next
+	return nil
+}
+
 func parseSearchArgs(args []string) (searchArgs, error) {
 	parsed := searchArgs{
 		filter:   index.Filter{Limit: 20},
@@ -264,15 +285,25 @@ func parseSearchArgs(args []string) (searchArgs, error) {
 		case "--json":
 			parsed.json = true
 		case "--semantic":
-			if parsed.filter.Mode == index.SearchModeHybrid {
-				return parsed, fmt.Errorf("search: --semantic and --hybrid are mutually exclusive")
+			if err := setSearchMode(&parsed.filter.Mode, index.SearchModeSemantic); err != nil {
+				return parsed, err
 			}
-			parsed.filter.Mode = index.SearchModeSemantic
 		case "--hybrid":
-			if parsed.filter.Mode == index.SearchModeSemantic {
-				return parsed, fmt.Errorf("search: --semantic and --hybrid are mutually exclusive")
+			if err := setSearchMode(&parsed.filter.Mode, index.SearchModeHybrid); err != nil {
+				return parsed, err
 			}
-			parsed.filter.Mode = index.SearchModeHybrid
+		case "--mode":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			mode, err := parseSearchMode(v)
+			if err != nil {
+				return parsed, err
+			}
+			if err := setSearchMode(&parsed.filter.Mode, mode); err != nil {
+				return parsed, err
+			}
 		case "--provider":
 			v, err := next()
 			if err != nil {

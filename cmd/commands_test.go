@@ -104,8 +104,38 @@ func TestParseSearchArgsSemanticAndHybridFlags(t *testing.T) {
 		t.Fatalf("hybrid parsed = %+v", parsed)
 	}
 
+	parsed, err = parseSearchArgs([]string{"phone setup", "--mode", "hybrid", "--provider", "fake", "--model", "fake-32"})
+	if err != nil {
+		t.Fatalf("parse --mode hybrid search args: %v", err)
+	}
+	if parsed.filter.Query != "phone setup" || parsed.filter.Mode != index.SearchModeHybrid || parsed.provider != "fake" || parsed.model != "fake-32" {
+		t.Fatalf("mode hybrid parsed = %+v", parsed)
+	}
+
+	parsed, err = parseSearchArgs([]string{"phone setup", "--mode", "semantic", "--provider", "fake", "--model", "fake-32"})
+	if err != nil {
+		t.Fatalf("parse --mode semantic search args: %v", err)
+	}
+	if parsed.filter.Query != "phone setup" || parsed.filter.Mode != index.SearchModeSemantic {
+		t.Fatalf("mode semantic parsed = %+v", parsed)
+	}
+
+	parsed, err = parseSearchArgs([]string{"phone setup", "--mode", "keyword"})
+	if err != nil {
+		t.Fatalf("parse --mode keyword search args: %v", err)
+	}
+	if parsed.filter.Query != "phone setup" || parsed.filter.Mode != index.SearchModeKeyword {
+		t.Fatalf("mode keyword parsed = %+v", parsed)
+	}
+
 	if _, err := parseSearchArgs([]string{"phone", "--semantic", "--hybrid"}); err == nil {
 		t.Fatalf("semantic+hybrid parsed without mutual exclusion error")
+	}
+	if _, err := parseSearchArgs([]string{"phone", "--semantic", "--mode", "hybrid"}); err == nil {
+		t.Fatalf("semantic+mode hybrid parsed without mutual exclusion error")
+	}
+	if _, err := parseSearchArgs([]string{"phone", "--mode", "weird"}); err == nil {
+		t.Fatalf("unknown --mode parsed without error")
 	}
 	if _, err := parseSearchArgs([]string{"--semantic", "--provider", "fake", "--model", "fake-32"}); err == nil {
 		t.Fatalf("semantic search parsed without query")
