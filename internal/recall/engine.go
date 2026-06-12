@@ -39,6 +39,8 @@ type indexStore interface {
 	Path(context.Context, string) (string, error)
 	Search(context.Context, index.Filter) ([]index.Hit, error)
 	ListIDs(context.Context) ([]string, error)
+	UpsertEmbedding(context.Context, index.Embedding) error
+	Embeddings(context.Context, string, string) ([]index.Embedding, error)
 	Close() error
 }
 

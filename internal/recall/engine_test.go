@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"recall/internal/embedding"
 	"recall/internal/index"
 	"recall/internal/memory"
 	"recall/internal/vault"
@@ -56,9 +57,10 @@ func sampleEngineMemory(t *testing.T) memory.Memory {
 }
 
 type fakeIndex struct {
-	paths     map[string]string
-	upsertErr error
-	deleteErr error
+	paths      map[string]string
+	embeddings []index.Embedding
+	upsertErr  error
+	deleteErr  error
 }
 
 func (f *fakeIndex) Upsert(_ context.Context, relPath string, m memory.Memory) error {
@@ -87,7 +89,26 @@ func (f *fakeIndex) Path(_ context.Context, id string) (string, error) {
 
 func (f *fakeIndex) Search(context.Context, index.Filter) ([]index.Hit, error) { return nil, nil }
 func (f *fakeIndex) ListIDs(context.Context) ([]string, error)                 { return nil, nil }
-func (f *fakeIndex) Close() error                                              { return nil }
+func (f *fakeIndex) UpsertEmbedding(_ context.Context, e index.Embedding) error {
+	for i, existing := range f.embeddings {
+		if existing.MemoryID == e.MemoryID && existing.Provider == e.Provider && existing.Model == e.Model {
+			f.embeddings[i] = e
+			return nil
+		}
+	}
+	f.embeddings = append(f.embeddings, e)
+	return nil
+}
+func (f *fakeIndex) Embeddings(_ context.Context, provider, model string) ([]index.Embedding, error) {
+	var out []index.Embedding
+	for _, e := range f.embeddings {
+		if e.Provider == provider && e.Model == model {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+func (f *fakeIndex) Close() error { return nil }
 
 func TestAddGetSearch(t *testing.T) {
 	e := newEngine(t)
@@ -129,6 +150,35 @@ func TestAddGetSearch(t *testing.T) {
 	}
 	if len(hits) != 1 || hits[0].ID != m.ID {
 		t.Errorf("Search = %+v", hits)
+	}
+}
+
+func TestEmbedAllEmbedsAndSkipsUnchangedMemories(t *testing.T) {
+	e := newEngine(t)
+	ctx := context.Background()
+
+	if _, _, err := e.Add(ctx, AddParams{Title: "Phone sync", Body: "iPhone setup preference", Domain: "tools"}); err != nil {
+		t.Fatalf("Add first: %v", err)
+	}
+	if _, _, err := e.Add(ctx, AddParams{Title: "Recall policy", Body: "local-first memory policy", Domain: "decisions"}); err != nil {
+		t.Fatalf("Add second: %v", err)
+	}
+
+	provider := embedding.NewFakeProvider("fake-32", 32)
+	stats, err := e.EmbedAll(ctx, provider, false)
+	if err != nil {
+		t.Fatalf("EmbedAll first: %v", err)
+	}
+	if stats.Embedded != 2 || stats.Skipped != 0 || stats.Failed != 0 {
+		t.Fatalf("first stats = %+v, want embedded 2 skipped 0 failed 0", stats)
+	}
+
+	stats, err = e.EmbedAll(ctx, provider, false)
+	if err != nil {
+		t.Fatalf("EmbedAll second: %v", err)
+	}
+	if stats.Embedded != 0 || stats.Skipped != 2 || stats.Failed != 0 {
+		t.Fatalf("second stats = %+v, want embedded 0 skipped 2 failed 0", stats)
 	}
 }
 
