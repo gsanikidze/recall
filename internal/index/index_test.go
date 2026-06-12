@@ -34,6 +34,85 @@ func mem(t *testing.T, id, title, domain, body string) memory.Memory {
 	}
 }
 
+func TestSemanticSearchReturnsNearestEmbeddingWithoutKeywordMatch(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	phone := mem(t, "01PHONE", "Phone setup", "tools", "iPhone sync preference")
+	docker := mem(t, "01DOCKER", "Docker deploy", "tools", "container deployment")
+	for _, item := range []struct {
+		path string
+		m    memory.Memory
+	}{
+		{"tools/phone.md", phone},
+		{"tools/docker.md", docker},
+	} {
+		if err := ix.Upsert(ctx, item.path, item.m); err != nil {
+			t.Fatalf("Upsert %s: %v", item.m.ID, err)
+		}
+	}
+	if err := ix.UpsertEmbedding(ctx, Embedding{MemoryID: phone.ID, Provider: "fake", Model: "fake", Dim: 2, Vector: []float32{1, 0}, ContentHash: "phone"}); err != nil {
+		t.Fatalf("phone embedding: %v", err)
+	}
+	if err := ix.UpsertEmbedding(ctx, Embedding{MemoryID: docker.ID, Provider: "fake", Model: "fake", Dim: 2, Vector: []float32{0, 1}, ContentHash: "docker"}); err != nil {
+		t.Fatalf("docker embedding: %v", err)
+	}
+
+	hits, err := ix.Search(ctx, Filter{Mode: SearchModeSemantic, Query: "unmatched words", QueryVector: []float32{0.9, 0.1}, Provider: "fake", Model: "fake", Limit: 2})
+	if err != nil {
+		t.Fatalf("Search semantic: %v", err)
+	}
+	if len(hits) != 2 || hits[0].ID != phone.ID {
+		t.Fatalf("semantic hits = %+v, want phone first", hits)
+	}
+	if hits[0].SemanticScore <= hits[1].SemanticScore {
+		t.Fatalf("semantic scores = %+v, want higher similarity on first hit", hits)
+	}
+}
+
+func TestSemanticSearchRespectsDomainAndLimit(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	tool := mem(t, "01TOOL", "Tool memory", "tools", "tool body")
+	project := mem(t, "01PROJECT", "Project memory", "projects", "project body")
+	if err := ix.Upsert(ctx, "tools/tool.md", tool); err != nil {
+		t.Fatalf("Upsert tool: %v", err)
+	}
+	if err := ix.Upsert(ctx, "projects/project.md", project); err != nil {
+		t.Fatalf("Upsert project: %v", err)
+	}
+	for _, id := range []string{tool.ID, project.ID} {
+		if err := ix.UpsertEmbedding(ctx, Embedding{MemoryID: id, Provider: "fake", Model: "fake", Dim: 2, Vector: []float32{1, 0}, ContentHash: id}); err != nil {
+			t.Fatalf("embedding %s: %v", id, err)
+		}
+	}
+
+	hits, err := ix.Search(ctx, Filter{Mode: SearchModeSemantic, QueryVector: []float32{1, 0}, Provider: "fake", Model: "fake", Domain: "tools", Limit: 1})
+	if err != nil {
+		t.Fatalf("Search semantic: %v", err)
+	}
+	if len(hits) != 1 || hits[0].ID != tool.ID {
+		t.Fatalf("semantic filtered hits = %+v, want only tool", hits)
+	}
+}
+
+func TestSemanticSearchValidatesRequiredVectorProviderAndModel(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	cases := []Filter{
+		{Mode: SearchModeSemantic, Provider: "fake", Model: "fake"},
+		{Mode: SearchModeSemantic, QueryVector: []float32{1}, Model: "fake"},
+		{Mode: SearchModeSemantic, QueryVector: []float32{1}, Provider: "fake"},
+	}
+	for _, f := range cases {
+		if _, err := ix.Search(ctx, f); err == nil {
+			t.Fatalf("Search(%+v) succeeded, want validation error", f)
+		}
+	}
+}
+
 func TestEmbeddingStorageRoundTrip(t *testing.T) {
 	ix := openIndex(t)
 	ctx := context.Background()
