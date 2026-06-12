@@ -77,6 +77,9 @@ func (ix *Index) Search(ctx context.Context, f Filter) ([]Hit, error) {
 	if f.Mode == SearchModeSemantic {
 		return ix.semanticSearch(ctx, f)
 	}
+	if f.Mode == SearchModeHybrid {
+		return ix.hybridSearch(ctx, f)
+	}
 	return ix.keywordSearch(ctx, f)
 }
 
@@ -174,6 +177,81 @@ WHERE 1 = 1`)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("index: search rows: %w", err)
+	}
+	return hits, nil
+}
+
+func (ix *Index) hybridSearch(ctx context.Context, f Filter) ([]Hit, error) {
+	limit := f.Limit
+	if limit <= 0 {
+		limit = defaultLimit
+	}
+	if limit > MaxLimit {
+		limit = MaxLimit
+	}
+	candidateLimit := limit * 5
+	if candidateLimit < 50 {
+		candidateLimit = 50
+	}
+	if candidateLimit > MaxLimit {
+		candidateLimit = MaxLimit
+	}
+
+	keywordFilter := f
+	keywordFilter.Mode = SearchModeKeyword
+	keywordFilter.QueryVector = nil
+	keywordFilter.Provider = ""
+	keywordFilter.Model = ""
+	keywordFilter.Limit = candidateLimit
+	keywordHits, err := ix.keywordSearch(ctx, keywordFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	semanticFilter := f
+	semanticFilter.Mode = SearchModeSemantic
+	semanticFilter.Limit = candidateLimit
+	semanticHits, err := ix.semanticSearch(ctx, semanticFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	merged := make(map[string]Hit, len(keywordHits)+len(semanticHits))
+	keywordDenom := float64(len(keywordHits) - 1)
+	if keywordDenom < 1 {
+		keywordDenom = 1
+	}
+	for rank, hit := range keywordHits {
+		hit.KeywordScore = 1 - (float64(rank) / keywordDenom)
+		merged[hit.ID] = hit
+	}
+	for _, hit := range semanticHits {
+		existing, ok := merged[hit.ID]
+		if ok {
+			existing.SemanticScore = hit.SemanticScore
+			if existing.Snippet == "" {
+				existing.Snippet = hit.Snippet
+			}
+			merged[hit.ID] = existing
+			continue
+		}
+		merged[hit.ID] = hit
+	}
+
+	hits := make([]Hit, 0, len(merged))
+	for _, hit := range merged {
+		importanceNorm := float64(hit.Importance-1) / 4.0
+		hit.Score = -(0.60 * hit.KeywordScore) - (0.40 * hit.SemanticScore) - (0.05 * importanceNorm)
+		hits = append(hits, hit)
+	}
+	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].Score == hits[j].Score {
+			return hits[i].ID < hits[j].ID
+		}
+		return hits[i].Score < hits[j].Score
+	})
+	if len(hits) > limit {
+		hits = hits[:limit]
 	}
 	return hits, nil
 }

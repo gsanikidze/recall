@@ -34,6 +34,69 @@ func mem(t *testing.T, id, title, domain, body string) memory.Memory {
 	}
 }
 
+func TestHybridSearchKeepsExactKeywordMatchHigh(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	exact := mem(t, "01EXACT", "Phone sync setup", "tools", "exact keyword match")
+	semanticOnly := mem(t, "01SEM", "Device preference", "tools", "unrelated body")
+	if err := ix.Upsert(ctx, "tools/exact.md", exact); err != nil {
+		t.Fatalf("Upsert exact: %v", err)
+	}
+	if err := ix.Upsert(ctx, "tools/semantic.md", semanticOnly); err != nil {
+		t.Fatalf("Upsert semantic: %v", err)
+	}
+	if err := ix.UpsertEmbedding(ctx, Embedding{MemoryID: exact.ID, Provider: "fake", Model: "fake", Dim: 2, Vector: []float32{0.8, 0.2}, ContentHash: "exact"}); err != nil {
+		t.Fatalf("exact embedding: %v", err)
+	}
+	if err := ix.UpsertEmbedding(ctx, Embedding{MemoryID: semanticOnly.ID, Provider: "fake", Model: "fake", Dim: 2, Vector: []float32{1, 0}, ContentHash: "semantic"}); err != nil {
+		t.Fatalf("semantic embedding: %v", err)
+	}
+
+	hits, err := ix.Search(ctx, Filter{Mode: SearchModeHybrid, Query: "phone sync", QueryVector: []float32{1, 0}, Provider: "fake", Model: "fake", Limit: 2})
+	if err != nil {
+		t.Fatalf("Search hybrid: %v", err)
+	}
+	if len(hits) != 2 || hits[0].ID != exact.ID {
+		t.Fatalf("hybrid hits = %+v, want exact keyword match first", hits)
+	}
+	if hits[0].KeywordScore == 0 || hits[0].SemanticScore == 0 {
+		t.Fatalf("hybrid hit missing score components: %+v", hits[0])
+	}
+}
+
+func TestHybridSearchIncludesSemanticOnlyRelatedResult(t *testing.T) {
+	ix := openIndex(t)
+	ctx := context.Background()
+
+	semanticOnly := mem(t, "01SEMREL", "Device preference", "tools", "unrelated body")
+	keywordOnly := mem(t, "01KEY", "Phone article", "tools", "phone keyword but far vector")
+	if err := ix.Upsert(ctx, "tools/semantic-related.md", semanticOnly); err != nil {
+		t.Fatalf("Upsert semantic: %v", err)
+	}
+	if err := ix.Upsert(ctx, "tools/keyword.md", keywordOnly); err != nil {
+		t.Fatalf("Upsert keyword: %v", err)
+	}
+	if err := ix.UpsertEmbedding(ctx, Embedding{MemoryID: semanticOnly.ID, Provider: "fake", Model: "fake", Dim: 2, Vector: []float32{1, 0}, ContentHash: "semantic"}); err != nil {
+		t.Fatalf("semantic embedding: %v", err)
+	}
+	if err := ix.UpsertEmbedding(ctx, Embedding{MemoryID: keywordOnly.ID, Provider: "fake", Model: "fake", Dim: 2, Vector: []float32{0, 1}, ContentHash: "keyword"}); err != nil {
+		t.Fatalf("keyword embedding: %v", err)
+	}
+
+	hits, err := ix.Search(ctx, Filter{Mode: SearchModeHybrid, Query: "phone", QueryVector: []float32{1, 0}, Provider: "fake", Model: "fake", Limit: 2})
+	if err != nil {
+		t.Fatalf("Search hybrid: %v", err)
+	}
+	ids := map[string]bool{}
+	for _, hit := range hits {
+		ids[hit.ID] = true
+	}
+	if !ids[semanticOnly.ID] {
+		t.Fatalf("hybrid hits = %+v, want semantic-only related result included", hits)
+	}
+}
+
 func TestSemanticSearchReturnsNearestEmbeddingWithoutKeywordMatch(t *testing.T) {
 	ix := openIndex(t)
 	ctx := context.Background()
