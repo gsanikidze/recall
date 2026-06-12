@@ -93,7 +93,23 @@ recall search sqlite --domain tools --limit 10
 recall search --tag go --project recall --json
 ```
 
-Importance is an integer from 1–5. `3` is default durable memory; `5` is critical operating context such as stable paths, preferences, and integration configs. Search ranking blends full-text relevance, recency, and importance.
+Populate local embedding cache with Ollama:
+
+```bash
+ollama pull nomic-embed-text
+recall embed --provider ollama --model nomic-embed-text
+```
+
+Semantic and hybrid search:
+
+```bash
+recall search "phone sync" --semantic --provider ollama --model nomic-embed-text
+recall search "phone sync" --hybrid --provider ollama --model nomic-embed-text --json
+```
+
+`embedded: 0, skipped: N` means vectors already exist for unchanged memories. Use `--force` to rebuild.
+
+Importance is an integer from 1–5. `3` is default durable memory; `5` is critical operating context such as stable paths, preferences, and integration configs. Keyword search ranking blends full-text relevance, recency, and importance. Semantic and hybrid modes use the SQLite embedding cache.
 
 Relationships are typed directed edges from one memory to another. Supported types: `related_to`, `about_project`, `uses_tool`, `depends_on`, `decided_by`, `supersedes`, `contradicts`, `references_person`. Markdown frontmatter is source of truth; SQLite stores `memory_relationships` as rebuildable graph index rows.
 
@@ -189,7 +205,7 @@ The REST API lives under `/api/` and includes:
 
 - `GET /api/domains`
 - `POST /api/domains`
-- `GET /api/memories`
+- `GET /api/memories` (`mode=keyword|semantic|hybrid`, `provider`, and `model` are supported for vector search)
 - `GET /api/memories/:id`
 - `POST /api/memories`
 - `PUT /api/memories/:id`
@@ -244,5 +260,6 @@ Recall is local-first and assumes local device trust, not hostile multi-user hos
 
 ## More docs
 
+- [Vector search](docs/vector-search.md)
 - [Development guide](docs/development.md)
 - [Code quality roadmap](docs/plans/2026-06-08-code-quality-roadmap.md)

@@ -67,7 +67,7 @@ Usage:
 Commands:
   init        Initialize a new recall workspace (--path DIR --force)
   add         Add a memory (--title --domain --body, or pipe body on stdin)
-  search      Search memories (query plus --domain --tag --project filters)
+  search      Search memories (default keyword; --semantic/--hybrid for vectors)
   embed       Embed indexed memories (--provider ollama|fake --model MODEL)
   get         Print a memory by id
   delete      Delete a memory by id
@@ -78,6 +78,11 @@ Commands:
   ui          Start the web UI at localhost:8888 (--port N --no-browser)
   help        Show this help
   version     Print version
+
+Vector search quick start:
+  ollama pull nomic-embed-text
+  recall embed --provider ollama --model nomic-embed-text
+  recall search "phone sync" --hybrid --provider ollama --model nomic-embed-text
 
 Run with no command to open the interactive TUI.
 `)
