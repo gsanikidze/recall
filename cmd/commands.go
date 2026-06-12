@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"recall/internal/embedding"
 	"recall/internal/index"
 	"recall/internal/memory"
 	"recall/internal/recall"
@@ -93,6 +94,85 @@ func parseRelationshipsFlag(raw string) ([]memory.Relationship, error) {
 		return nil, fmt.Errorf("add: --relationships must be JSON array of {target_id,type,note}: %w", err)
 	}
 	return rels, nil
+}
+
+type embedArgs struct {
+	provider string
+	model    string
+	baseURL  string
+	force    bool
+	json     bool
+}
+
+func parseEmbedArgs(args []string) (embedArgs, error) {
+	parsed := embedArgs{
+		provider: "ollama",
+		model:    embedding.DefaultOllamaModel,
+		baseURL:  os.Getenv("RECALL_OLLAMA_URL"),
+	}
+	fs := flag.NewFlagSet("embed", flag.ContinueOnError)
+	fs.StringVar(&parsed.provider, "provider", parsed.provider, "embedding provider: ollama or fake")
+	fs.StringVar(&parsed.model, "model", parsed.model, "embedding model")
+	fs.StringVar(&parsed.baseURL, "base-url", parsed.baseURL, "Ollama base URL")
+	fs.BoolVar(&parsed.force, "force", false, "re-embed memories even when content hash matches")
+	fs.BoolVar(&parsed.json, "json", false, "print JSON")
+	if err := fs.Parse(args); err != nil {
+		return parsed, err
+	}
+	if fs.NArg() != 0 {
+		return parsed, fmt.Errorf("usage: recall embed [--provider ollama|fake] [--model MODEL] [--base-url URL] [--force] [--json]")
+	}
+	parsed.provider = strings.TrimSpace(parsed.provider)
+	parsed.model = strings.TrimSpace(parsed.model)
+	if parsed.provider == "" {
+		return parsed, fmt.Errorf("embed: --provider is required")
+	}
+	if parsed.model == "" {
+		return parsed, fmt.Errorf("embed: --model is required")
+	}
+	return parsed, nil
+}
+
+func embeddingProviderFromArgs(args embedArgs) (embedding.Provider, error) {
+	switch args.provider {
+	case "ollama":
+		return embedding.NewOllamaProvider(args.baseURL, args.model), nil
+	case "fake":
+		return embedding.NewFakeProvider(args.model, 32), nil
+	default:
+		return nil, fmt.Errorf("embed: unknown provider %q", args.provider)
+	}
+}
+
+// Embed computes embedding vectors for indexed memories and stores them in SQLite.
+func Embed(args []string) error {
+	parsed, err := parseEmbedArgs(args)
+	if err != nil {
+		return err
+	}
+	provider, err := embeddingProviderFromArgs(parsed)
+	if err != nil {
+		return err
+	}
+	e, err := openEngine()
+	if err != nil {
+		return err
+	}
+	defer e.Close()
+
+	stats, err := e.EmbedAll(context.Background(), provider, parsed.force)
+	if err != nil {
+		return err
+	}
+	if parsed.json {
+		return printJSON(struct {
+			Provider string `json:"provider"`
+			Model    string `json:"model"`
+			recall.EmbedStats
+		}{Provider: provider.Name(), Model: provider.Model(), EmbedStats: stats})
+	}
+	fmt.Printf("embedded %d memories, skipped %d, failed %d\nprovider %s model %s\n", stats.Embedded, stats.Skipped, stats.Failed, provider.Name(), provider.Model())
+	return nil
 }
 
 // Search runs a query and prints ranked hits.

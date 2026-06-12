@@ -8,6 +8,64 @@ import (
 	"testing"
 )
 
+func TestParseEmbedArgs(t *testing.T) {
+	parsed, err := parseEmbedArgs([]string{"--provider", "fake", "--model", "fake-32", "--json"})
+	if err != nil {
+		t.Fatalf("parseEmbedArgs fake: %v", err)
+	}
+	if parsed.provider != "fake" || parsed.model != "fake-32" || !parsed.json {
+		t.Fatalf("fake parsed = %+v", parsed)
+	}
+
+	parsed, err = parseEmbedArgs([]string{"--provider", "ollama", "--model", "nomic-embed-text", "--base-url", "http://127.0.0.1:11434"})
+	if err != nil {
+		t.Fatalf("parseEmbedArgs ollama: %v", err)
+	}
+	if parsed.provider != "ollama" || parsed.model != "nomic-embed-text" || parsed.baseURL != "http://127.0.0.1:11434" {
+		t.Fatalf("ollama parsed = %+v", parsed)
+	}
+
+	parsed, err = parseEmbedArgs([]string{"--force"})
+	if err != nil {
+		t.Fatalf("parseEmbedArgs force: %v", err)
+	}
+	if parsed.provider != "ollama" || parsed.model != "nomic-embed-text" || !parsed.force {
+		t.Fatalf("force/default parsed = %+v", parsed)
+	}
+}
+
+func TestEmbedJSONFlowWithFakeProvider(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "brain")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := Init([]string{"--path", project, "--force"}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if err := Add([]string{"--title", "Phone Sync", "--domain", "tools", "--body", "iPhone sync setup"}); err != nil {
+		t.Fatalf("Add first: %v", err)
+	}
+	if err := Add([]string{"--title", "Recall Policy", "--domain", "decisions", "--body", "local first memory policy"}); err != nil {
+		t.Fatalf("Add second: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Embed([]string{"--provider", "fake", "--model", "fake-32", "--json"}); err != nil {
+			t.Fatalf("Embed json: %v", err)
+		}
+	})
+	if !strings.Contains(out, `"provider": "fake"`) || !strings.Contains(out, `"model": "fake-32"`) || !strings.Contains(out, `"embedded": 2`) || !strings.Contains(out, `"skipped": 0`) {
+		t.Fatalf("embed json output = %s", out)
+	}
+
+	out = captureStdout(t, func() {
+		if err := Embed([]string{"--provider", "fake", "--model", "fake-32", "--json"}); err != nil {
+			t.Fatalf("Embed json second: %v", err)
+		}
+	})
+	if !strings.Contains(out, `"embedded": 0`) || !strings.Contains(out, `"skipped": 2`) {
+		t.Fatalf("second embed json output = %s", out)
+	}
+}
+
 func TestParseSearchArgsAcceptsFlagsAfterQuery(t *testing.T) {
 	parsed, err := parseSearchArgs([]string{"Smoke memory", "--domain", "tools", "--tag", "smoke", "--project", "recall", "--limit", "5", "--json"})
 	if err != nil {

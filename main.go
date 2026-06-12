@@ -29,6 +29,8 @@ func main() {
 		err = cmd.Add(rest)
 	case "search":
 		err = cmd.Search(rest)
+	case "embed":
+		err = cmd.Embed(rest)
 	case "get":
 		err = cmd.Get(rest)
 	case "delete", "rm":
@@ -66,6 +68,7 @@ Commands:
   init        Initialize a new recall workspace (--path DIR --force)
   add         Add a memory (--title --domain --body, or pipe body on stdin)
   search      Search memories (query plus --domain --tag --project filters)
+  embed       Embed indexed memories (--provider ollama|fake --model MODEL)
   get         Print a memory by id
   delete      Delete a memory by id
   domain      Manage domains: domain list | domain add <name> --desc "..."
