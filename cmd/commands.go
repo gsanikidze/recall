@@ -188,6 +188,23 @@ func Search(args []string) error {
 	}
 	defer e.Close()
 
+	if parsed.filter.Mode == index.SearchModeSemantic || parsed.filter.Mode == index.SearchModeHybrid {
+		provider, err := searchEmbeddingProvider(parsed)
+		if err != nil {
+			return err
+		}
+		vectors, err := provider.Embed(context.Background(), []string{parsed.filter.Query})
+		if err != nil {
+			return err
+		}
+		if len(vectors) != 1 {
+			return fmt.Errorf("search: provider returned %d query vectors, want 1", len(vectors))
+		}
+		parsed.filter.QueryVector = vectors[0]
+		parsed.filter.Provider = provider.Name()
+		parsed.filter.Model = provider.Model()
+	}
+
 	hits, err := e.Search(context.Background(), parsed.filter)
 	if err != nil {
 		return err
@@ -208,12 +225,31 @@ func Search(args []string) error {
 }
 
 type searchArgs struct {
-	filter index.Filter
-	json   bool
+	filter   index.Filter
+	provider string
+	model    string
+	baseURL  string
+	json     bool
+}
+
+func searchEmbeddingProvider(args searchArgs) (embedding.Provider, error) {
+	switch args.provider {
+	case "ollama":
+		return embedding.NewOllamaProvider(args.baseURL, args.model), nil
+	case "fake":
+		return embedding.NewFakeProvider(args.model, 32), nil
+	default:
+		return nil, fmt.Errorf("search: unknown provider %q", args.provider)
+	}
 }
 
 func parseSearchArgs(args []string) (searchArgs, error) {
-	parsed := searchArgs{filter: index.Filter{Limit: 20}}
+	parsed := searchArgs{
+		filter:   index.Filter{Limit: 20},
+		provider: "ollama",
+		model:    embedding.DefaultOllamaModel,
+		baseURL:  os.Getenv("RECALL_OLLAMA_URL"),
+	}
 	var query []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -227,6 +263,34 @@ func parseSearchArgs(args []string) (searchArgs, error) {
 		switch a {
 		case "--json":
 			parsed.json = true
+		case "--semantic":
+			if parsed.filter.Mode == index.SearchModeHybrid {
+				return parsed, fmt.Errorf("search: --semantic and --hybrid are mutually exclusive")
+			}
+			parsed.filter.Mode = index.SearchModeSemantic
+		case "--hybrid":
+			if parsed.filter.Mode == index.SearchModeSemantic {
+				return parsed, fmt.Errorf("search: --semantic and --hybrid are mutually exclusive")
+			}
+			parsed.filter.Mode = index.SearchModeHybrid
+		case "--provider":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			parsed.provider = strings.TrimSpace(v)
+		case "--model":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			parsed.model = strings.TrimSpace(v)
+		case "--base-url":
+			v, err := next()
+			if err != nil {
+				return parsed, err
+			}
+			parsed.baseURL = strings.TrimSpace(v)
 		case "--include-expired":
 			parsed.filter.IncludeExpired = true
 		case "--domain":
@@ -283,6 +347,17 @@ func parseSearchArgs(args []string) (searchArgs, error) {
 		}
 	}
 	parsed.filter.Query = strings.Join(query, " ")
+	if parsed.filter.Mode == index.SearchModeSemantic || parsed.filter.Mode == index.SearchModeHybrid {
+		if strings.TrimSpace(parsed.filter.Query) == "" {
+			return parsed, fmt.Errorf("search: semantic and hybrid search require a query")
+		}
+		if parsed.provider == "" {
+			return parsed, fmt.Errorf("search: --provider is required")
+		}
+		if parsed.model == "" {
+			return parsed, fmt.Errorf("search: --model is required")
+		}
+	}
 	return parsed, nil
 }
 

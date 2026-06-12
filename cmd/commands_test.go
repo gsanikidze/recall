@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"recall/internal/index"
 )
 
 func TestParseEmbedArgs(t *testing.T) {
@@ -82,6 +84,57 @@ func TestParseSearchArgsAcceptsFlagsAfterQuery(t *testing.T) {
 	}
 	if !parsed.json {
 		t.Fatalf("json flag not captured")
+	}
+}
+
+func TestParseSearchArgsSemanticAndHybridFlags(t *testing.T) {
+	parsed, err := parseSearchArgs([]string{"phone setup", "--semantic", "--provider", "fake", "--model", "fake-32", "--base-url", "http://127.0.0.1:11434"})
+	if err != nil {
+		t.Fatalf("parse semantic search args: %v", err)
+	}
+	if parsed.filter.Query != "phone setup" || parsed.filter.Mode != index.SearchModeSemantic || parsed.provider != "fake" || parsed.model != "fake-32" || parsed.baseURL != "http://127.0.0.1:11434" {
+		t.Fatalf("semantic parsed = %+v", parsed)
+	}
+
+	parsed, err = parseSearchArgs([]string{"phone setup", "--hybrid", "--provider", "fake", "--model", "fake-32"})
+	if err != nil {
+		t.Fatalf("parse hybrid search args: %v", err)
+	}
+	if parsed.filter.Query != "phone setup" || parsed.filter.Mode != index.SearchModeHybrid || parsed.provider != "fake" || parsed.model != "fake-32" {
+		t.Fatalf("hybrid parsed = %+v", parsed)
+	}
+
+	if _, err := parseSearchArgs([]string{"phone", "--semantic", "--hybrid"}); err == nil {
+		t.Fatalf("semantic+hybrid parsed without mutual exclusion error")
+	}
+	if _, err := parseSearchArgs([]string{"--semantic", "--provider", "fake", "--model", "fake-32"}); err == nil {
+		t.Fatalf("semantic search parsed without query")
+	}
+}
+
+func TestSearchSemanticJSONFlowWithFakeProvider(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "brain")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := Init([]string{"--path", project, "--force"}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if err := Add([]string{"--title", "Phone Sync", "--domain", "tools", "--body", "iPhone Obsidian sync setup"}); err != nil {
+		t.Fatalf("Add phone: %v", err)
+	}
+	if err := Add([]string{"--title", "Recall Policy", "--domain", "decisions", "--body", "local first memory policy"}); err != nil {
+		t.Fatalf("Add policy: %v", err)
+	}
+	if err := Embed([]string{"--provider", "fake", "--model", "fake-32"}); err != nil {
+		t.Fatalf("Embed fake: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Search([]string{"phone sync", "--semantic", "--provider", "fake", "--model", "fake-32", "--json"}); err != nil {
+			t.Fatalf("Search semantic fake: %v", err)
+		}
+	})
+	if !strings.Contains(out, `"hits"`) || !strings.Contains(out, `"semantic_score"`) || !strings.Contains(out, "Phone Sync") {
+		t.Fatalf("semantic search json output = %s", out)
 	}
 }
 
