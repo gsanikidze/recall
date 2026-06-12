@@ -16,7 +16,11 @@ export interface MemoryHit {
   path: string
   importance: number
   score: number
+  keyword_score?: number
+  semantic_score?: number
 }
+
+export type SearchMode = 'keyword' | 'semantic' | 'hybrid'
 
 export type Lifecycle = 'evergreen' | 'expires'
 
@@ -86,6 +90,9 @@ export interface MemoryFilter {
   until?: string
   include_expired?: boolean
   limit?: number
+  mode?: SearchMode
+  provider?: string
+  model?: string
 }
 
 export interface CreateMemoryParams {

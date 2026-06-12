@@ -9,7 +9,7 @@ import { NewMemoryDialog } from '@/components/NewMemoryDialog'
 import { useDomains, useMemories, useMemory, useGraph, useReindex, keys } from '@/queries'
 import { useDebounce } from '@/lib/useDebounce'
 import { domainRoute, memoryRoute, graphRoute, routeParam } from '@/lib/routes'
-import type { MemoryDetail, MemoryFilter } from '@/api/types'
+import type { MemoryDetail, MemoryFilter, SearchMode } from '@/api/types'
 
 const MemoryEditor = lazy(() => import('@/components/MemoryEditor').then(module => ({ default: module.MemoryEditor })))
 const GraphView = lazy(() => import('@/components/GraphView').then(module => ({ default: module.GraphView })))
@@ -23,6 +23,7 @@ function AppShell() {
   const qc = useQueryClient()
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchMode, setSearchMode] = useState<SearchMode>('keyword')
   const [showNewDomain, setShowNewDomain] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [editorDirty, setEditorDirty] = useState(false)
@@ -33,6 +34,11 @@ function AppShell() {
   const { data: domains = [] } = useDomains()
   const memoryFilter: MemoryFilter = { q: debouncedQuery }
   if (domain) memoryFilter.domain = domain
+  if (searchMode !== 'keyword' && debouncedQuery.trim()) {
+    memoryFilter.mode = searchMode
+    memoryFilter.provider = 'ollama'
+    memoryFilter.model = 'nomic-embed-text'
+  }
   const { data: memories = [], isLoading } = useMemories(memoryFilter)
   const { data: selectedMemory } = useMemory(!isGraph ? id ?? null : null)
   const { data: graph = { nodes: [], edges: [] }, isLoading: graphLoading, error: graphError } = useGraph(domain ?? null)
@@ -87,7 +93,9 @@ function AppShell() {
               loading={isLoading}
               selectedId={id ?? null}
               searchQuery={searchQuery}
+              searchMode={searchMode}
               onSearchChange={setSearchQuery}
+              onSearchModeChange={setSearchMode}
               onSelect={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
               onNew={() => setShowNew(true)}
               onGraph={() => guardedNavigate(graphRoute(domain ?? null))}

@@ -1,14 +1,16 @@
 import { Plus, Network } from 'lucide-react'
 import { MemoryCard } from './MemoryCard'
 import { SearchBar } from './SearchBar'
-import type { MemoryHit } from '@/api/types'
+import type { MemoryHit, SearchMode } from '@/api/types'
 
 interface Props {
   memories: MemoryHit[]
   loading: boolean
   selectedId: string | null
   searchQuery: string
+  searchMode: SearchMode
   onSearchChange: (q: string) => void
+  onSearchModeChange: (mode: SearchMode) => void
   onSelect: (id: string) => void
   onNew: () => void
   onGraph: () => void
@@ -16,9 +18,15 @@ interface Props {
 }
 
 export function MemoryList({
-  memories, loading, selectedId, searchQuery,
-  onSearchChange, onSelect, onNew, onGraph, graphSelected = false,
+  memories, loading, selectedId, searchQuery, searchMode,
+  onSearchChange, onSearchModeChange, onSelect, onNew, onGraph, graphSelected = false,
 }: Props) {
+  const modes: Array<{ value: SearchMode; label: string }> = [
+    { value: 'keyword', label: 'Keyword' },
+    { value: 'semantic', label: 'Semantic' },
+    { value: 'hybrid', label: 'Hybrid' },
+  ]
+
   return (
     <div className="flex flex-col h-full border-r border-white/5">
       {/* Toolbar */}
@@ -38,6 +46,22 @@ export function MemoryList({
         >
           <Plus className="w-3.5 h-3.5" /> New
         </button>
+      </div>
+
+      <div className="px-3 py-2 border-b border-white/5">
+        <div role="group" aria-label="Search mode" className="flex items-center gap-1 rounded-lg bg-white/5 p-1">
+          {modes.map(mode => (
+            <button
+              key={mode.value}
+              type="button"
+              aria-pressed={searchMode === mode.value}
+              onClick={() => onSearchModeChange(mode.value)}
+              className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${searchMode === mode.value ? 'bg-violet-600 text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/5'}`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* List */}

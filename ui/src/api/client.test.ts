@@ -6,6 +6,7 @@ import {
   getMemory,
   getGraph,
   listDomains,
+  listMemories,
   updateMemory,
 } from './client'
 
@@ -103,6 +104,19 @@ describe('api client', () => {
     })
 
     expect(fetchMock).toHaveBeenCalledWith('/api/graph?domain=tools', expect.any(Object))
+  })
+
+  it('sends semantic search mode and embedding provider params', async () => {
+    const fetchMock = mockFetch(jsonResponse({ memories: [] }))
+
+    await expect(listMemories({
+      q: 'phone sync',
+      mode: 'semantic',
+      provider: 'ollama',
+      model: 'nomic-embed-text',
+    })).resolves.toEqual([])
+
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe('/api/memories?q=phone+sync&mode=semantic&provider=ollama&model=nomic-embed-text')
   })
 
   it('encodes path params', async () => {

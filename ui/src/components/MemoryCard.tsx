@@ -20,6 +20,16 @@ export function MemoryCard({ memory, selected, onClick }: Props) {
         <span className="text-[11px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 font-mono">
           {memory.domain}
         </span>
+        {memory.semantic_score != null && memory.semantic_score > 0 && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 font-mono">
+            semantic {memory.semantic_score.toFixed(2)}
+          </span>
+        )}
+        {memory.keyword_score != null && memory.keyword_score > 0 && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 font-mono">
+            keyword {memory.keyword_score.toFixed(2)}
+          </span>
+        )}
       </div>
       <p className="text-sm font-medium text-white/90 truncate">{memory.title}</p>
       {memory.snippet && (

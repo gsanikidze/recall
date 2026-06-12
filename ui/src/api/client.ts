@@ -55,6 +55,9 @@ export async function listMemories(filter: MemoryFilter = {}, signal?: AbortSign
   if (filter.until) params.set('until', filter.until)
   if (filter.include_expired) params.set('include_expired', 'true')
   if (filter.limit) params.set('limit', String(filter.limit))
+  if (filter.mode && filter.mode !== 'keyword') params.set('mode', filter.mode)
+  if (filter.provider) params.set('provider', filter.provider)
+  if (filter.model) params.set('model', filter.model)
   const data = await request<{ memories: MemoryHit[] }>(`/api/memories?${params}`, initWithSignal(signal))
   return data.memories ?? []
 }
