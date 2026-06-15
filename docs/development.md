@@ -164,7 +164,28 @@ Current decision: keep sentinel and document it.
 
 ## API/UI development loop
 
-Run Go server with no browser:
+Run Go API server and Vite UI dev server together:
+
+```bash
+go run . dev
+```
+
+Or use Make:
+
+```bash
+make dev
+```
+
+Options:
+
+```bash
+go run . dev --api-port 8888 --ui-port 5173 --install
+```
+
+This starts the API at `http://localhost:8888` and Vite at
+`http://localhost:5173`. `--install` runs `npm --prefix ui ci` first.
+
+For separate processes, run Go server with no browser:
 
 ```bash
 go run . ui --no-browser --port 8888

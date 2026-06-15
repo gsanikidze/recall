@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const apiURL = process.env.RECALL_API_URL ?? 'http://localhost:8888'
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -15,7 +17,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8888',
+        target: apiURL,
         changeOrigin: true,
       },
     },

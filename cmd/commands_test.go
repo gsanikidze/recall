@@ -249,6 +249,31 @@ func TestUseRequiresPath(t *testing.T) {
 	}
 }
 
+func TestParseDevArgs(t *testing.T) {
+	parsed, err := parseDevArgs(nil)
+	if err != nil {
+		t.Fatalf("parseDevArgs defaults: %v", err)
+	}
+	if parsed.apiPort != 8888 || parsed.uiPort != 5173 || parsed.install {
+		t.Fatalf("default dev args = %+v", parsed)
+	}
+
+	parsed, err = parseDevArgs([]string{"--api-port", "9999", "--ui-port", "5174", "--install"})
+	if err != nil {
+		t.Fatalf("parseDevArgs custom: %v", err)
+	}
+	if parsed.apiPort != 9999 || parsed.uiPort != 5174 || !parsed.install {
+		t.Fatalf("custom dev args = %+v", parsed)
+	}
+	if parsed.apiURL() != "http://localhost:9999" {
+		t.Fatalf("apiURL = %q", parsed.apiURL())
+	}
+
+	if _, err := parseDevArgs([]string{"extra"}); err == nil || !strings.Contains(err.Error(), "usage: recall dev") {
+		t.Fatalf("parseDevArgs extra err = %v", err)
+	}
+}
+
 func TestAddSearchGetDeleteJSONFlow(t *testing.T) {
 	project := filepath.Join(t.TempDir(), "brain")
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())

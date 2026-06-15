@@ -47,6 +47,8 @@ func main() {
 		err = cmd.MCP(rest, version)
 	case "ui":
 		err = cmd.UI(rest)
+	case "dev":
+		err = cmd.Dev(rest)
 	case "version", "-v", "--version":
 		fmt.Printf("recall %s\n", version)
 	default:
@@ -79,6 +81,7 @@ Commands:
   reindex     Rebuild the SQLite index from the vault
   mcp         Run the MCP server (stdio) for LLM agents
   ui          Start the web UI at localhost:8888 (--port N --no-browser)
+  dev         Start local API and Vite UI together (--api-port N --ui-port N)
   help        Show this help
   version     Print version
 

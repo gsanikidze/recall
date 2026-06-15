@@ -76,9 +76,9 @@ build-nui:
 	mkdir -p $(BIN_DIR)
 	go build -o $(BIN) .
 
-# Run the Go API server for development (pair with `cd ui && npm run dev`)
+# Run the Go API server and Vite UI dev server together.
 dev:
-	go run . ui --no-browser
+	go run . dev
 
 check: fmt-check tidy-check vet test race cover generate-check lint-ui test-ui build-ui audit-ui build-nui build test-ui-tag
 

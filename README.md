@@ -196,6 +196,15 @@ Use absolute paths when configuring long-lived agent processes.
 
 ## Web UI / API development
 
+Run API and Vite dev UI together:
+
+```bash
+recall dev
+recall dev --api-port 8888 --ui-port 5173 --install
+```
+
+`--install` runs `npm --prefix ui ci` before starting Vite.
+
 Run API/UI server from Go:
 
 ```bash
