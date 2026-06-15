@@ -1,5 +1,5 @@
 import type {
-  Domain, MemoryHit, MemoryDetail, MemoryFilter, GraphData,
+  Domain, MemoryHit, MemoryDetail, MemoryFilter, GraphData, Status,
   CreateDomainParams, CreateMemoryParams, UpdateMemoryParams,
 } from './types'
 
@@ -38,6 +38,10 @@ function initWithSignal(signal?: AbortSignal): RequestInit {
 export async function listDomains(signal?: AbortSignal): Promise<Domain[]> {
   const data = await request<{ domains: Domain[] }>('/api/domains', initWithSignal(signal))
   return data.domains
+}
+
+export async function getStatus(signal?: AbortSignal): Promise<Status> {
+  return request<Status>('/api/status', initWithSignal(signal))
 }
 
 export async function createDomain(params: CreateDomainParams): Promise<Domain> {

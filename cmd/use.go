@@ -3,7 +3,9 @@ package cmd
 import (
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 )
 
 type projectPaths struct {
@@ -39,13 +41,40 @@ func Use(args []string) error {
 		return err
 	}
 	fmt.Printf("project stored at: %s\nvault: %s\ndb: %s\n", out.ProjectPath, out.VaultPath, out.DBPath)
+	for _, warning := range useProjectWarnings(out.ProjectPath) {
+		fmt.Printf("warning: %s\n", warning)
+	}
 	return nil
+}
+
+func useProjectWarnings(projectPath string) []string {
+	entries, err := os.ReadDir(projectPath)
+	if err != nil {
+		return nil
+	}
+	var rootMarkdown []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.EqualFold(filepath.Ext(name), ".md") {
+			rootMarkdown = append(rootMarkdown, name)
+		}
+	}
+	if len(rootMarkdown) == 0 {
+		return nil
+	}
+	return []string{fmt.Sprintf("Markdown files at the project root are not indexed; move them into vault/ for Recall to read them: %s", strings.Join(rootMarkdown, ", "))}
 }
 
 func useProject(path string) (projectPaths, error) {
 	resolved, err := resolvePath(path)
 	if err != nil {
 		return projectPaths{}, err
+	}
+	if filepath.Base(resolved) == "vault" {
+		return projectPaths{}, fmt.Errorf("recall use expects the project root, not the vault directory; use %s", filepath.Dir(resolved))
 	}
 	if err := createDataDirectoryScaffold(resolved); err != nil {
 		return projectPaths{}, err

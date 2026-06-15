@@ -5,6 +5,7 @@ import {
   deleteMemory,
   getMemory,
   getGraph,
+  getStatus,
   listDomains,
   listMemories,
   updateMemory,
@@ -90,6 +91,21 @@ describe('api client', () => {
       method: 'POST',
       body: JSON.stringify({ name: 'personal-notes', description: 'Private notes' }),
     }))
+  })
+
+  it('fetches active project status', async () => {
+    const fetchMock = mockFetch(jsonResponse({
+      project_path: '/tmp/brain',
+      vault_path: '/tmp/brain/vault',
+      db_path: '/tmp/brain/db/recall.sqlite',
+    }))
+
+    await expect(getStatus()).resolves.toEqual({
+      project_path: '/tmp/brain',
+      vault_path: '/tmp/brain/vault',
+      db_path: '/tmp/brain/db/recall.sqlite',
+    })
+    expect(fetchMock).toHaveBeenCalledWith('/api/status', expect.any(Object))
   })
 
   it('fetches graph data with optional domain filter', async () => {

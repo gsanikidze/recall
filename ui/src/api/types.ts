@@ -3,6 +3,12 @@ export interface Domain {
   description: string
 }
 
+export interface Status {
+  project_path: string
+  vault_path: string
+  db_path: string
+}
+
 export interface CreateDomainParams {
   name: string
   description?: string

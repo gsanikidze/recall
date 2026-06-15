@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -42,6 +43,7 @@ func New(e *recall.Engine) *fiber.App {
 	)
 
 	api.Get("/domains", s.listDomains)
+	api.Get("/status", s.status)
 	api.Post("/domains", s.createDomain)
 	api.Get("/graph", s.getGraph)
 	api.Get("/memories", s.listMemories)
@@ -93,7 +95,22 @@ type memoryJSON struct {
 	Body          string                `json:"body"`
 }
 
+type statusJSON struct {
+	ProjectPath string `json:"project_path"`
+	VaultPath   string `json:"vault_path"`
+	DBPath      string `json:"db_path"`
+}
+
 // ---- handlers ----
+
+func (s *server) status(c *fiber.Ctx) error {
+	projectPath := s.engine.ProjectPath()
+	return c.JSON(statusJSON{
+		ProjectPath: projectPath,
+		VaultPath:   s.engine.Vault().Root(),
+		DBPath:      filepath.Join(projectPath, "db", "recall.sqlite"),
+	})
+}
 
 func (s *server) listDomains(c *fiber.Ctx) error {
 	domains, err := s.engine.Vault().ListDomains()

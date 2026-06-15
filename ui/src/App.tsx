@@ -6,7 +6,7 @@ import { DomainSidebar } from '@/components/DomainSidebar'
 import { MemoryList } from '@/components/MemoryList'
 import { NewDomainDialog } from '@/components/NewDomainDialog'
 import { NewMemoryDialog } from '@/components/NewMemoryDialog'
-import { useDomains, useMemories, useMemory, useGraph, useReindex, keys } from '@/queries'
+import { useDomains, useStatus, useMemories, useMemory, useGraph, useReindex, keys } from '@/queries'
 import { useDebounce } from '@/lib/useDebounce'
 import { domainRoute, memoryRoute, graphRoute, routeParam } from '@/lib/routes'
 import type { MemoryDetail, MemoryFilter, SearchMode } from '@/api/types'
@@ -31,6 +31,7 @@ function AppShell() {
   const debouncedQuery = useDebounce(searchQuery, 300)
   const isGraph = location.pathname === '/graph' || location.pathname.endsWith('/graph')
 
+  const { data: status } = useStatus()
   const { data: domains = [] } = useDomains()
   const memoryFilter: MemoryFilter = { q: debouncedQuery }
   if (domain) memoryFilter.domain = domain
@@ -76,6 +77,7 @@ function AppShell() {
   return (
     <>
       <Layout
+        projectPath={status?.project_path}
         sidebar={
           <DomainSidebar
             domains={domains}

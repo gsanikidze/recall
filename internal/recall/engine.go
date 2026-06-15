@@ -29,8 +29,9 @@ var ErrValidation = errors.New("recall: validation failed")
 
 // Engine couples a vault with its index.
 type Engine struct {
-	vault *vault.Vault
-	index indexStore
+	projectPath string
+	vault       *vault.Vault
+	index       indexStore
 }
 
 type indexStore interface {
@@ -56,7 +57,7 @@ func Open(projectPath string) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Engine{vault: vault.Open(vaultDir), index: ix}, nil
+	return &Engine{projectPath: projectPath, vault: vault.Open(vaultDir), index: ix}, nil
 }
 
 // Close releases the index handle.
@@ -64,6 +65,9 @@ func (e *Engine) Close() error { return e.index.Close() }
 
 // Vault exposes the underlying vault (for domain operations and init scaffolding).
 func (e *Engine) Vault() *vault.Vault { return e.vault }
+
+// ProjectPath returns the active Recall project root for status displays.
+func (e *Engine) ProjectPath() string { return e.projectPath }
 
 // AddParams describes a new memory. Lifecycle defaults to evergreen; ExpiresOn
 // is required (and only valid) when Lifecycle is "expires".

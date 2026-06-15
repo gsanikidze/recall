@@ -243,6 +243,40 @@ func TestUseUpdatesProjectConfigAndPreservesExistingFiles(t *testing.T) {
 	}
 }
 
+func TestUseWarnsWhenExistingMarkdownIsOutsideVault(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "existing-brain")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatalf("mkdir project: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(project, "meeting-notes.md"), []byte("root note"), 0o644); err != nil {
+		t.Fatalf("write root markdown: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Use([]string{project}); err != nil {
+			t.Fatalf("Use: %v", err)
+		}
+	})
+	if !strings.Contains(out, "warning:") || !strings.Contains(out, "vault/") || !strings.Contains(out, "meeting-notes.md") {
+		t.Fatalf("use output should warn about root markdown outside vault, got %s", out)
+	}
+}
+
+func TestUseRejectsDirectVaultDirectory(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "brain")
+	directVault := filepath.Join(project, "vault")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := os.MkdirAll(directVault, 0o755); err != nil {
+		t.Fatalf("mkdir vault: %v", err)
+	}
+
+	err := Use([]string{directVault})
+	if err == nil || !strings.Contains(err.Error(), "project root") || !strings.Contains(err.Error(), project) {
+		t.Fatalf("Use(vault) err = %v", err)
+	}
+}
+
 func TestUseRequiresPath(t *testing.T) {
 	if err := Use(nil); err == nil || !strings.Contains(err.Error(), "usage: recall use <path>") {
 		t.Fatalf("Use(nil) err = %v", err)

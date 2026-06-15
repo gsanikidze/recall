@@ -28,4 +28,18 @@ describe('Layout', () => {
     expect(screen.getByText('graph workspace')).toBeInTheDocument()
     expect(screen.queryByTestId('memory-list-pane')).not.toBeInTheDocument()
   })
+
+  it('shows the active project path when provided', () => {
+    render(
+      <Layout
+        sidebar={<div>sidebar</div>}
+        list={<div>memory list</div>}
+        editor={<div>editor</div>}
+        projectPath="/tmp/brain"
+      />,
+    )
+
+    expect(screen.getByText('Active project')).toBeInTheDocument()
+    expect(screen.getByText('/tmp/brain')).toBeInTheDocument()
+  })
 })

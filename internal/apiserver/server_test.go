@@ -85,6 +85,24 @@ func TestDNSRebindGuardRejectsNonLoopbackHost(t *testing.T) {
 	}
 }
 
+func TestStatusEndpointShowsActiveProject(t *testing.T) {
+	e, app := newTestApp(t)
+	resp := doReq(t, app, http.MethodGet, "/api/status", "")
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 200 body=%s", resp.StatusCode, body)
+	}
+	var got struct {
+		ProjectPath string `json:"project_path"`
+		VaultPath   string `json:"vault_path"`
+		DBPath      string `json:"db_path"`
+	}
+	decodeJSON(t, resp, &got)
+	if got.ProjectPath != e.ProjectPath() || got.VaultPath != e.Vault().Root() || got.DBPath == "" {
+		t.Fatalf("status body = %+v, engine project=%q vault=%q", got, e.ProjectPath(), e.Vault().Root())
+	}
+}
+
 func TestCORSAllowlistForViteOrigins(t *testing.T) {
 	_, app := newTestApp(t)
 	for _, origin := range []string{"http://localhost:5173", "http://127.0.0.1:5173"} {

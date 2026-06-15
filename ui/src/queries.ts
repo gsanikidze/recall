@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query'
 import {
   listDomains,
+  getStatus,
   createDomain,
   listMemories,
   getMemory,
@@ -18,10 +19,18 @@ import {
 import type { MemoryFilter, CreateDomainParams, CreateMemoryParams, UpdateMemoryParams } from '@/api/types'
 
 export const keys = {
+  status: () => ['status'] as const,
   domains: () => ['domains'] as const,
   memories: (filter: MemoryFilter) => ['memories', filter] as const,
   memory: (id: string | null) => ['memory', id] as const,
   graph: (domain: string | null) => ['graph', domain] as const,
+}
+
+export function useStatus() {
+  return useQuery({
+    queryKey: keys.status(),
+    queryFn: ({ signal }) => getStatus(signal),
+  })
 }
 
 export function useDomains() {
