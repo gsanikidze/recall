@@ -195,6 +195,60 @@ func TestInitPathFlagAndEnvOverride(t *testing.T) {
 	}
 }
 
+func TestUseUpdatesProjectConfigAndPreservesExistingFiles(t *testing.T) {
+	configHome := t.TempDir()
+	project := filepath.Join(t.TempDir(), "existing-brain")
+	existing := filepath.Join(project, "notes.md")
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatalf("mkdir project: %v", err)
+	}
+	if err := os.WriteFile(existing, []byte("keep me"), 0o644); err != nil {
+		t.Fatalf("write existing file: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Use([]string{project}); err != nil {
+			t.Fatalf("Use: %v", err)
+		}
+	})
+	if !strings.Contains(out, "project stored at: "+project) {
+		t.Fatalf("use output = %s", out)
+	}
+
+	cfg, found, err := loadConfig()
+	if err != nil || !found {
+		t.Fatalf("loadConfig found=%v err=%v", found, err)
+	}
+	if cfg.ProjectPath != project {
+		t.Fatalf("config project = %q, want %q", cfg.ProjectPath, project)
+	}
+	if _, err := os.Stat(existing); err != nil {
+		t.Fatalf("existing file not preserved: %v", err)
+	}
+	for _, rel := range []string{filepath.Join("vault", "README.md"), "db"} {
+		if _, err := os.Stat(filepath.Join(project, rel)); err != nil {
+			t.Fatalf("missing scaffold %s: %v", rel, err)
+		}
+	}
+
+	e, err := openEngine()
+	if err != nil {
+		t.Fatalf("openEngine: %v", err)
+	}
+	defer e.Close()
+	if got := filepath.Dir(e.Vault().Root()); got != project {
+		t.Fatalf("engine project = %q, want %q", got, project)
+	}
+}
+
+func TestUseRequiresPath(t *testing.T) {
+	if err := Use(nil); err == nil || !strings.Contains(err.Error(), "usage: recall use <path>") {
+		t.Fatalf("Use(nil) err = %v", err)
+	}
+}
+
 func TestAddSearchGetDeleteJSONFlow(t *testing.T) {
 	project := filepath.Join(t.TempDir(), "brain")
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())

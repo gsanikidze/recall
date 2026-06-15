@@ -21,14 +21,29 @@ import (
 )
 
 // Serve runs the MCP server on stdio until the connection closes.
-func Serve(ctx context.Context, e *recall.Engine, version string) error {
+func Serve(ctx context.Context, e *recall.Engine, version string, switchers ...ProjectSwitcher) error {
 	server := mcp.NewServer(&mcp.Implementation{Name: "recall", Version: version}, nil)
-	register(server, e)
+	register(server, e, switchers...)
 	return server.Run(ctx, &mcp.StdioTransport{})
 }
 
+// ProjectSwitcher changes the saved Recall project directory.
+type ProjectSwitcher func(context.Context, string) (ProjectOut, error)
+
+type ProjectOut struct {
+	ProjectPath string `json:"project_path"`
+	VaultPath   string `json:"vault_path"`
+	DBPath      string `json:"db_path"`
+}
+
+type projectOut = ProjectOut
+
 // register wires every tool onto the server.
-func register(server *mcp.Server, e *recall.Engine) {
+func register(server *mcp.Server, e *recall.Engine, switchers ...ProjectSwitcher) {
+	var switcher ProjectSwitcher
+	if len(switchers) > 0 {
+		switcher = switchers[0]
+	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "recall_search",
 		Description: "Search long-lived memory for relevant facts. Provide a natural-language " +
@@ -66,6 +81,34 @@ func register(server *mcp.Server, e *recall.Engine) {
 		Name:        "recall_reindex",
 		Description: "Rebuild the search index from the Markdown vault, picking up any hand-edited files.",
 	}, reindexHandler(e))
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "recall_use_project",
+		Description: "Change the saved Recall project directory. Existing files are preserved; missing " +
+			"vault/ and db/ scaffold directories are created. New MCP sessions use the new directory.",
+	}, useProjectHandler(switcher))
+}
+
+// ---- recall_use_project ----
+
+type useProjectArgs struct {
+	Path string `json:"path" jsonschema:"project root containing vault/ and db/, or where they should be created"`
+}
+
+func useProjectHandler(switcher ProjectSwitcher) func(context.Context, *mcp.CallToolRequest, useProjectArgs) (*mcp.CallToolResult, ProjectOut, error) {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, a useProjectArgs) (*mcp.CallToolResult, ProjectOut, error) {
+		if strings.TrimSpace(a.Path) == "" {
+			return nil, ProjectOut{}, fmt.Errorf("path is required")
+		}
+		if switcher == nil {
+			return nil, ProjectOut{}, fmt.Errorf("project switcher is not configured")
+		}
+		out, err := switcher(ctx, a.Path)
+		if err != nil {
+			return nil, ProjectOut{}, err
+		}
+		return jsonResult(out), out, nil
+	}
 }
 
 // ---- recall_search ----

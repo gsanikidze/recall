@@ -49,6 +49,16 @@ Difference:
 recall init --path ~/brain
 ```
 
+Change Recall to an existing project directory without the interactive init
+prompt:
+
+```bash
+recall use /path/to/existing/folder
+```
+
+This preserves existing files and creates missing `vault/` and `db/` scaffold
+folders. Point at the project root, not directly at `vault/`.
+
 Config path is OS-dependent. On Linux it is usually:
 
 ```text

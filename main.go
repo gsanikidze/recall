@@ -25,6 +25,8 @@ func main() {
 		printHelp()
 	case "init":
 		err = cmd.Init(rest)
+	case "use":
+		err = cmd.Use(rest)
 	case "add":
 		err = cmd.Add(rest)
 	case "search":
@@ -66,6 +68,7 @@ Usage:
 
 Commands:
   init        Initialize a new recall workspace (--path DIR --force)
+  use         Change saved project directory without prompting (use <path>)
   add         Add a memory (--title --domain --body, or pipe body on stdin)
   search      Search memories (default keyword; --mode keyword|semantic|hybrid or --semantic/--hybrid for vectors)
   embed       Embed indexed memories (--provider ollama|fake --model MODEL)

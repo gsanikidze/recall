@@ -16,5 +16,11 @@ func MCP(args []string, version string) error {
 	}
 	defer e.Close()
 
-	return mcpserver.Serve(context.Background(), e, version)
+	return mcpserver.Serve(context.Background(), e, version, func(_ context.Context, path string) (mcpserver.ProjectOut, error) {
+		out, err := useProject(path)
+		if err != nil {
+			return mcpserver.ProjectOut{}, err
+		}
+		return mcpserver.ProjectOut{ProjectPath: out.ProjectPath, VaultPath: out.VaultPath, DBPath: out.DBPath}, nil
+	})
 }

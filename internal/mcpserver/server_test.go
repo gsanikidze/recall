@@ -23,6 +23,10 @@ func startTestServer(t *testing.T) *mcp.ClientSession {
 }
 
 func startTestServerWithEngine(t *testing.T) (*recall.Engine, *mcp.ClientSession) {
+	return startTestServerWithEngineAndSwitcher(t, nil)
+}
+
+func startTestServerWithEngineAndSwitcher(t *testing.T, switcher ProjectSwitcher) (*recall.Engine, *mcp.ClientSession) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -36,7 +40,7 @@ func startTestServerWithEngine(t *testing.T) (*recall.Engine, *mcp.ClientSession
 	t.Cleanup(func() { _ = e.Close() })
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "recall", Version: "test"}, nil)
-	register(server, e)
+	register(server, e, switcher)
 
 	serverT, clientT := mcp.NewInMemoryTransports()
 	if _, err := server.Connect(ctx, serverT, nil); err != nil {
@@ -106,6 +110,7 @@ func TestMCPToolsListed(t *testing.T) {
 	want := map[string]bool{
 		"recall_search": false, "recall_get": false, "recall_add": false,
 		"recall_update": false, "recall_list_domains": false, "recall_reindex": false,
+		"recall_use_project": false,
 	}
 	for _, tool := range res.Tools {
 		if _, ok := want[tool.Name]; ok {
@@ -117,6 +122,26 @@ func TestMCPToolsListed(t *testing.T) {
 			t.Errorf("tool %q not registered", name)
 		}
 	}
+}
+
+func TestMCPUseProjectCallsSwitcher(t *testing.T) {
+	_, s := startTestServerWithEngineAndSwitcher(t, func(ctx context.Context, path string) (projectOut, error) {
+		if path != "/tmp/new-brain" {
+			t.Fatalf("path = %q", path)
+		}
+		return projectOut{ProjectPath: path, VaultPath: path + "/vault", DBPath: path + "/db/recall.sqlite"}, nil
+	})
+
+	var out projectOut
+	call(t, s, "recall_use_project", map[string]any{"path": "/tmp/new-brain"}, &out)
+	if out.ProjectPath != "/tmp/new-brain" || out.VaultPath != "/tmp/new-brain/vault" || out.DBPath != "/tmp/new-brain/db/recall.sqlite" {
+		t.Fatalf("use project out = %+v", out)
+	}
+}
+
+func TestMCPUseProjectRejectsBlankPath(t *testing.T) {
+	s := startTestServer(t)
+	callExpectError(t, s, "recall_use_project", map[string]any{"path": " \t"}, "path is required")
 }
 
 func TestMCPAddSearchGetFlow(t *testing.T) {
