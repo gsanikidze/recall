@@ -3,6 +3,7 @@
 /bin
 *.exe
 *.out
+.hermes
 
 # Test & coverage
 *.test
