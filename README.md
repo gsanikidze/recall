@@ -194,6 +194,8 @@ Example MCP server config shape for an agent:
 
 Use absolute paths when configuring long-lived agent processes.
 
+MCP gives agents memory tools. For consistent behavior, also give agents the bootstrap policy in [`docs/agent-instructions.md`](docs/agent-instructions.md). Copy [`docs/templates/AGENTS.md`](docs/templates/AGENTS.md) into agent-managed repositories, or install the Hermes-compatible skill template at [`skills/recall-memory/SKILL.md`](skills/recall-memory/SKILL.md).
+
 ## Web UI / API development
 
 Run API and Vite dev UI together:
