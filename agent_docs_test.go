@@ -12,6 +12,30 @@ func TestAgentInstructionArtifactsExist(t *testing.T) {
 		requires []string
 	}{
 		{
+			path: "AGENTS.md",
+			requires: []string{
+				"# Recall agent setup",
+				"make build-nui",
+				"hermes mcp add recall",
+				"hermes mcp test recall",
+				"hermes skills install",
+				"/reload-mcp",
+				"/reload-skills",
+			},
+		},
+		{
+			path: "docs/llm-setup.md",
+			requires: []string{
+				"# LLM setup for Recall MCP and skills",
+				"RECALL_PROJECT",
+				"hermes mcp add recall",
+				"hermes mcp configure recall",
+				"hermes skills install",
+				"docs/agent-instructions.md",
+				"skills/recall-memory/SKILL.md",
+			},
+		},
+		{
 			path: "docs/agent-instructions.md",
 			requires: []string{
 				"# Recall agent instructions",
@@ -21,6 +45,8 @@ func TestAgentInstructionArtifactsExist(t *testing.T) {
 				"recall_list_domains",
 				"recall_add",
 				"Never store secrets, raw chat logs, generic Q&A, or temporary task progress.",
+				"Hermes setup",
+				"hermes mcp test recall",
 			},
 		},
 		{
@@ -30,6 +56,8 @@ func TestAgentInstructionArtifactsExist(t *testing.T) {
 				"Recall MCP",
 				"Read flow",
 				"Write flow",
+				"Install / enable",
+				"hermes mcp test recall",
 			},
 		},
 		{

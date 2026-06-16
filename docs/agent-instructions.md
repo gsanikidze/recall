@@ -8,6 +8,22 @@ Use Recall before answering questions about previous projects, decisions, people
 
 MCP is the primary interface. Do not shell out to `recall` CLI when Recall MCP tools are available.
 
+## Hermes setup
+
+For Hermes Agent, configure Recall MCP and the Recall skill from the repo root:
+
+```bash
+hermes mcp add recall --command /usr/local/bin/recall --args mcp --env RECALL_PROJECT=$HOME/brain
+hermes mcp test recall
+hermes mcp configure recall
+hermes skills install ./skills/recall-memory/SKILL.md --name recall-memory
+hermes skills list | grep recall-memory
+```
+
+Running Hermes sessions need `/reload-mcp` after MCP changes and `/reload-skills` after skill changes. New sessions see both automatically.
+
+For non-Hermes agents, copy `docs/templates/AGENTS.md` into the target repo and configure the equivalent MCP server with `command: /usr/local/bin/recall`, `args: ["mcp"]`, and `RECALL_PROJECT=/path/to/brain`.
+
 ## Read flow
 
 1. Call `recall_search` with a natural-language query and any useful filters.

@@ -2,6 +2,45 @@
 
 This project uses Recall as local-first long-lived memory for agents.
 
+## Install / enable
+
+If Hermes Agent is available, verify Recall MCP and skill setup:
+
+```bash
+hermes mcp test recall
+hermes skills list | grep recall-memory
+```
+
+If not configured yet, from the Recall repo use:
+
+```bash
+hermes mcp add recall --command /usr/local/bin/recall --args mcp --env RECALL_PROJECT=$HOME/brain
+hermes mcp test recall
+hermes mcp configure recall
+hermes skills install ./skills/recall-memory/SKILL.md --name recall-memory
+```
+
+In running Hermes sessions, reload changed integrations:
+
+```text
+/reload-mcp
+/reload-skills
+```
+
+For non-Hermes agents, configure equivalent MCP server:
+
+```json
+{
+  "mcpServers": {
+    "recall": {
+      "command": "/usr/local/bin/recall",
+      "args": ["mcp"],
+      "env": {"RECALL_PROJECT": "/home/you/brain"}
+    }
+  }
+}
+```
+
 ## Recall MCP
 
 If Recall MCP tools are available, use them as the primary memory interface. MCP provides tool access; this policy provides behavior.
