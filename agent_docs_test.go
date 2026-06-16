@@ -33,6 +33,51 @@ func TestAgentInstructionArtifactsExist(t *testing.T) {
 				"hermes skills install",
 				"docs/agent-instructions.md",
 				"skills/recall-memory/SKILL.md",
+				"docs/examples/hermes-mcp-recall.yaml",
+				"scripts/install-hermes-recall.sh",
+				"scripts/verify-agent-setup.sh",
+			},
+		},
+		{
+			path: "docs/examples/hermes-mcp-recall.yaml",
+			requires: []string{
+				"mcp_servers:",
+				"recall:",
+				"command: /usr/local/bin/recall",
+				"args: [mcp]",
+				"RECALL_PROJECT: /home/you/brain",
+				"enabled: true",
+			},
+		},
+		{
+			path: "docs/examples/mcp-recall.json",
+			requires: []string{
+				"\"mcpServers\"",
+				"\"recall\"",
+				"\"command\": \"/usr/local/bin/recall\"",
+				"\"args\": [\"mcp\"]",
+				"\"RECALL_PROJECT\": \"/home/you/brain\"",
+			},
+		},
+		{
+			path: "scripts/install-hermes-recall.sh",
+			requires: []string{
+				"set -euo pipefail",
+				"hermes mcp add recall",
+				"recall-memory",
+				"COPY_AGENT_TEMPLATE_TO",
+				"/reload-mcp",
+				"/reload-skills",
+			},
+		},
+		{
+			path: "scripts/verify-agent-setup.sh",
+			requires: []string{
+				"set -euo pipefail",
+				"TestAgentInstructionArtifactsExist",
+				"hermes mcp test recall",
+				"recall-memory",
+				"docs/examples/hermes-mcp-recall.yaml",
 			},
 		},
 		{

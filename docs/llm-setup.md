@@ -9,7 +9,11 @@ This guide gives LLM agents enough information to install and verify Recall as l
 | `AGENTS.md` | Root bootstrap for agents working inside this repo. |
 | `docs/agent-instructions.md` | Runtime policy: when/how agents should use Recall. |
 | `docs/templates/AGENTS.md` | Copy into other repos so coding agents know to use Recall. |
+| `docs/examples/hermes-mcp-recall.yaml` | Copyable Hermes `config.yaml` MCP snippet. |
+| `docs/examples/mcp-recall.json` | Generic MCP client config snippet. |
 | `skills/recall-memory/SKILL.md` | Hermes skill package for Recall memory behavior. |
+| `scripts/install-hermes-recall.sh` | Installs/copies Hermes Recall MCP and skill setup. |
+| `scripts/verify-agent-setup.sh` | Verifies docs, examples, skill, MCP, and Hermes visibility when available. |
 | `README.md` | User-facing build, CLI, MCP, UI, and check commands. |
 
 ## Prerequisites
@@ -63,11 +67,24 @@ db/recall.sqlite   Rebuildable SQLite index
 
 Use absolute command paths for long-lived Hermes/gateway processes.
 
+Fast path from this repo:
+
+```bash
+scripts/install-hermes-recall.sh
+```
+
+Manual CLI setup:
+
 ```bash
 hermes mcp add recall --command /usr/local/bin/recall --args mcp --env RECALL_PROJECT=$HOME/brain
 hermes mcp test recall
 hermes mcp configure recall
 ```
+
+Copyable config examples:
+
+- `docs/examples/hermes-mcp-recall.yaml` — paste under Hermes `config.yaml`.
+- `docs/examples/mcp-recall.json` — generic MCP client config.
 
 Expected `hermes mcp test recall` result:
 
@@ -168,6 +185,7 @@ go test ./... -run TestAgentInstructionArtifactsExist -count=1
 go test ./...
 hermes mcp test recall
 hermes skills list | grep recall-memory
+scripts/verify-agent-setup.sh
 ```
 
 Check manually:

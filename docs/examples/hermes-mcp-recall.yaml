@@ -1,0 +1,13 @@
+# Hermes Agent MCP server config for Recall.
+# Add under ~/.hermes/config.yaml or install with:
+# hermes mcp add recall --command /usr/local/bin/recall --args mcp --env RECALL_PROJECT=/home/you/brain
+
+mcp_servers:
+  recall:
+    command: /usr/local/bin/recall
+    args: [mcp]
+    env:
+      RECALL_PROJECT: /home/you/brain
+    enabled: true
+    timeout: 120
+    connect_timeout: 60

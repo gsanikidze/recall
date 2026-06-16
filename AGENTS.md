@@ -112,12 +112,40 @@ Core rule: use Recall before answering questions about previous projects, decisi
 
 Never store secrets, raw chat logs, generic Q&A, or temporary task progress.
 
+## Copyable config examples
+
+Use these when an agent needs explicit MCP config instead of CLI setup:
+
+- `docs/examples/hermes-mcp-recall.yaml` — Hermes `config.yaml` snippet.
+- `docs/examples/mcp-recall.json` — generic MCP client snippet.
+
+## Setup scripts
+
+Install/copy Hermes Recall integration:
+
+```bash
+scripts/install-hermes-recall.sh
+```
+
+Optional copy into another repo:
+
+```bash
+COPY_AGENT_TEMPLATE_TO=/path/to/repo scripts/install-hermes-recall.sh
+```
+
+Verify all agent setup docs/scripts/configs:
+
+```bash
+scripts/verify-agent-setup.sh
+```
+
 ## Verification
 
 ```bash
 go test ./... -run TestAgentInstructionArtifactsExist -count=1
 go test ./...
 hermes mcp test recall
+scripts/verify-agent-setup.sh
 ```
 
 If docs or setup templates change, update `agent_docs_test.go` so required bootstrapping text stays covered.

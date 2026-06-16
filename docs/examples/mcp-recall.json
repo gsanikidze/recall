@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "recall": {
+      "command": "/usr/local/bin/recall",
+      "args": ["mcp"],
+      "env": {
+        "RECALL_PROJECT": "/home/you/brain"
+      }
+    }
+  }
+}
