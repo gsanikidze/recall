@@ -5,11 +5,10 @@ import { Layout } from '@/components/Layout'
 import { DomainSidebar } from '@/components/DomainSidebar'
 import { MemoryList } from '@/components/MemoryList'
 import { NewDomainDialog } from '@/components/NewDomainDialog'
-import { NewMemoryDialog } from '@/components/NewMemoryDialog'
 import { useDomains, useStatus, useMemories, useMemory, useGraph, useReindex, keys } from '@/queries'
 import { useDebounce } from '@/lib/useDebounce'
 import { domainRoute, memoryRoute, graphRoute, routeParam } from '@/lib/routes'
-import type { MemoryDetail, MemoryFilter, SearchMode } from '@/api/types'
+import type { MemoryFilter, SearchMode } from '@/api/types'
 
 const MemoryEditor = lazy(() => import('@/components/MemoryEditor').then(module => ({ default: module.MemoryEditor })))
 const GraphView = lazy(() => import('@/components/GraphView').then(module => ({ default: module.GraphView })))
@@ -25,7 +24,6 @@ function AppShell() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchMode, setSearchMode] = useState<SearchMode>('keyword')
   const [showNewDomain, setShowNewDomain] = useState(false)
-  const [showNew, setShowNew] = useState(false)
   const [editorDirty, setEditorDirty] = useState(false)
 
   const debouncedQuery = useDebounce(searchQuery, 300)
@@ -51,22 +49,6 @@ function AppShell() {
     setEditorDirty(false)
     navigate(to, options)
   }, [editorDirty, navigate])
-
-  const handleSaved = useCallback((updated: MemoryDetail) => {
-    setEditorDirty(false)
-    navigate(memoryRoute(domain ?? null, updated.id), { replace: true })
-  }, [navigate, domain])
-
-  const handleDeleted = useCallback(() => {
-    setEditorDirty(false)
-    navigate(domainRoute(domain ?? null))
-  }, [navigate, domain])
-
-  const handleCreated = useCallback((newId: string) => {
-    setShowNew(false)
-    setEditorDirty(false)
-    navigate(memoryRoute(domain ?? null, newId))
-  }, [navigate, domain])
 
   const handleDomainCreated = useCallback((name: string) => {
     setShowNewDomain(false)
@@ -99,7 +81,6 @@ function AppShell() {
               onSearchChange={setSearchQuery}
               onSearchModeChange={setSearchMode}
               onSelect={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
-              onNew={() => setShowNew(true)}
               onGraph={() => guardedNavigate(graphRoute(domain ?? null))}
               graphSelected={isGraph}
             />
@@ -120,27 +101,17 @@ function AppShell() {
               <MemoryEditor
                 key={selectedMemory.id}
                 memory={selectedMemory}
-                onSaved={handleSaved}
-                onDeleted={handleDeleted}
                 onDirtyChange={setEditorDirty}
               />
             </Suspense>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-white/20 text-sm gap-2">
-              <span>Select a memory to edit</span>
-              <span className="text-xs">or create a new one</span>
+              <span>Select a memory to view</span>
+              <span className="text-xs">agent-written context appears here read-only</span>
             </div>
           )
         }
       />
-
-      {showNew && (
-        <NewMemoryDialog
-          domains={domains}
-          onCreated={handleCreated}
-          onClose={() => setShowNew(false)}
-        />
-      )}
 
       {showNewDomain && (
         <NewDomainDialog

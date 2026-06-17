@@ -14,7 +14,6 @@ function renderList(overrides: Partial<React.ComponentProps<typeof MemoryList>> 
     onSearchChange: vi.fn(),
     onSearchModeChange: vi.fn(),
     onSelect: vi.fn(),
-    onNew: vi.fn(),
     onGraph: vi.fn(),
     ...overrides,
   }
@@ -23,6 +22,14 @@ function renderList(overrides: Partial<React.ComponentProps<typeof MemoryList>> 
 }
 
 describe('MemoryList search mode toggle', () => {
+  it('frames the UI as read/view-first without a primary manual new-memory button', () => {
+    renderList()
+
+    expect(screen.getByText(/agent-written/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /graph/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^new$/i })).not.toBeInTheDocument()
+  })
+
   it('shows Keyword, Semantic, and Hybrid search mode options', () => {
     renderList()
 

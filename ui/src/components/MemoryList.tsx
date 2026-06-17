@@ -1,4 +1,4 @@
-import { Plus, Network } from 'lucide-react'
+import { Network } from 'lucide-react'
 import { MemoryCard } from './MemoryCard'
 import { SearchBar } from './SearchBar'
 import type { MemoryHit, SearchMode } from '@/api/types'
@@ -12,14 +12,13 @@ interface Props {
   onSearchChange: (q: string) => void
   onSearchModeChange: (mode: SearchMode) => void
   onSelect: (id: string) => void
-  onNew: () => void
   onGraph: () => void
   graphSelected?: boolean
 }
 
 export function MemoryList({
   memories, loading, selectedId, searchQuery, searchMode,
-  onSearchChange, onSearchModeChange, onSelect, onNew, onGraph, graphSelected = false,
+  onSearchChange, onSearchModeChange, onSelect, onGraph, graphSelected = false,
 }: Props) {
   const modes: Array<{ value: SearchMode; label: string }> = [
     { value: 'keyword', label: 'Keyword' },
@@ -40,15 +39,12 @@ export function MemoryList({
         >
           <Network className="w-3.5 h-3.5" /> Graph
         </button>
-        <button
-          onClick={onNew}
-          className="flex-shrink-0 flex items-center gap-1 px-2.5 py-2 text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" /> New
-        </button>
       </div>
 
-      <div className="px-3 py-2 border-b border-white/5">
+      <div className="px-3 py-2 border-b border-white/5 space-y-2">
+        <p className="text-[11px] leading-4 text-white/35">
+          Agent-written memories. Browse, search, and inspect stored context; write through MCP/CLI/API.
+        </p>
         <div role="group" aria-label="Search mode" className="flex items-center gap-1 rounded-lg bg-white/5 p-1">
           {modes.map(mode => (
             <button

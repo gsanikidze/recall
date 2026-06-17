@@ -1,6 +1,6 @@
 # Recall
 
-Recall is a local-first memory CLI and web UI for humans and AI agents. It stores durable facts as Markdown files in a vault, indexes them in local SQLite, and exposes the same memory through CLI commands, an MCP server, and a loopback-only web UI/API.
+Recall is a local-first memory layer for AI agents. Agents write structured durable facts through CLI/MCP/API, humans inspect them through a read-only web UI, and everything stays stored as Markdown plus a rebuildable local SQLite index.
 
 ## Status
 
@@ -14,7 +14,7 @@ A Recall project contains:
 - `db/recall.sqlite` — rebuildable SQLite search/index database.
 - `vault/README.md` and per-domain `README.md` files — human/agent guidance for what belongs where.
 
-Default domains include `tools`, `inbox`, `people`, `projects`, `decisions`, `research`, and `goals`. Add custom domains with `recall domain add` or from the UI.
+Default domains include `tools`, `inbox`, `people`, `projects`, `decisions`, `research`, and `goals`. Add custom domains with `recall domain add` or from the UI. Memories are intended to be written by agents or scripts through CLI/MCP/API; the web UI is read/view-first so humans can audit what was stored.
 
 ## Install / build
 
@@ -167,6 +167,8 @@ Start web UI/API:
 recall ui --port 8888
 recall ui --port 8888 --no-browser
 ```
+
+The web UI is intentionally read/view-first for memories: browse, search, inspect metadata, and follow graph relationships. Create/update/delete memories through CLI, MCP, or API so agents and scripts prepare structured durable data before it enters the vault.
 
 ## MCP setup
 

@@ -1,155 +1,124 @@
-import { useEffect, useState } from 'react'
-import MDEditor from '@uiw/react-md-editor'
-import { Save, Trash2 } from 'lucide-react'
-import { MetadataPanel } from './MetadataPanel'
-import { useUpdateMemory, useDeleteMemory } from '@/queries'
+import { useEffect } from 'react'
+import { CalendarDays, GitBranch, Link2, Tag } from 'lucide-react'
 import type { MemoryDetail } from '@/api/types'
 
 interface Props {
   memory: MemoryDetail
-  onSaved: (updated: MemoryDetail) => void
-  onDeleted: () => void
   onDirtyChange?: (dirty: boolean) => void
 }
 
-export function MemoryEditor({ memory, onSaved, onDeleted, onDirtyChange }: Props) {
-  const [draft, setDraft] = useState<MemoryDetail>(memory)
-  const [error, setError] = useState<string | null>(null)
+function optionalValue(value: string | undefined | null) {
+  return value && value.trim() ? value : '—'
+}
 
-  const updateMutation = useUpdateMemory()
-  const deleteMutation = useDeleteMemory()
+function formatDateRange(memory: MemoryDetail) {
+  if (memory.created === memory.updated) return memory.created
+  return `${memory.created} → ${memory.updated}`
+}
 
-  const handleSave = () => {
-    setError(null)
-    if (draft.lifecycle === 'expires' && !draft.expires_on) {
-      setError('Expiry date is required when lifecycle is expires.')
-      return
-    }
-    const expiresOn = draft.lifecycle === 'evergreen' ? '' : draft.expires_on
-    updateMutation.mutate(
-      {
-        id: memory.id,
-        params: {
-          title: draft.title,
-          body: draft.body,
-          tags: draft.tags,
-          project: draft.project,
-          lifecycle: draft.lifecycle,
-          expires_on: expiresOn,
-          source: draft.source,
-          links: draft.links,
-          relationships: draft.relationships,
-          importance: draft.importance,
-        },
-      },
-      {
-        onSuccess: onSaved,
-        onError: (e) => setError(e instanceof Error ? e.message : String(e)),
-      },
-    )
-  }
-
-  const handleDelete = () => {
-    if (!confirm(`Delete "${memory.title}"?`)) return
-    setError(null)
-    deleteMutation.mutate(memory.id, {
-      onSuccess: onDeleted,
-      onError: (e) => setError(e instanceof Error ? e.message : String(e)),
-    })
-  }
-
-  const relationshipKey = (relationships: MemoryDetail['relationships']) =>
-    relationships.map(rel => `${rel.target_id}\0${rel.type}\0${rel.note ?? ''}`).join('\0\0')
-
-  const isDirty =
-    draft.title !== memory.title ||
-    draft.body !== memory.body ||
-    draft.project !== memory.project ||
-    draft.lifecycle !== memory.lifecycle ||
-    draft.expires_on !== memory.expires_on ||
-    draft.source !== memory.source ||
-    draft.importance !== memory.importance ||
-    draft.tags.join('\0') !== memory.tags.join('\0') ||
-    draft.links.join('\0') !== memory.links.join('\0') ||
-    relationshipKey(draft.relationships) !== relationshipKey(memory.relationships)
-
+export function MemoryEditor({ memory, onDirtyChange }: Props) {
   useEffect(() => {
-    onDirtyChange?.(isDirty)
-  }, [isDirty, onDirtyChange])
-
-  useEffect(() => {
-    if (!isDirty) return
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [isDirty])
-
-  const saving = updateMutation.isPending
-  const deleting = deleteMutation.isPending
+    onDirtyChange?.(false)
+  }, [memory.id, onDirtyChange])
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Title */}
-      <div className="px-4 pt-4 pb-2 border-b border-white/5">
-        <input
-          aria-label="Memory title"
-          value={draft.title}
-          onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
-          className="w-full bg-transparent text-lg font-semibold text-white/90 placeholder:text-white/30 focus:outline-none"
-          placeholder="Memory title…"
-        />
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-[11px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 font-mono">
-            {memory.domain}
-          </span>
-          <span className="text-[11px] text-white/30">{memory.path}</span>
+    <div className="flex flex-col h-full overflow-hidden bg-[#111]">
+      <header className="px-5 py-4 border-b border-white/5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-medium">
+                Agent-written memory
+              </span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 font-mono">
+                {memory.domain}
+              </span>
+            </div>
+            <h1 className="text-xl font-semibold text-white/90 truncate">{memory.title}</h1>
+            <p className="mt-1 text-xs text-white/35 font-mono break-all">{memory.path}</p>
+          </div>
         </div>
-      </div>
+        <p className="mt-3 text-xs text-white/40 max-w-3xl">
+          Read-only view. Recall is optimized for agent-prepared durable data; use MCP, CLI, or API writes to change stored memories.
+        </p>
+      </header>
 
-      {/* Metadata (collapsible) */}
-      <MetadataPanel
-        memory={draft}
-        onChange={patch => setDraft(d => ({ ...d, ...patch }))}
-      />
+      <main className="flex-1 overflow-y-auto p-5 space-y-5">
+        <section aria-label="Memory body" className="rounded-xl border border-white/8 bg-black/20 p-4">
+          <pre className="whitespace-pre-wrap break-words text-sm leading-6 text-white/80 font-sans">{memory.body || 'No body stored.'}</pre>
+        </section>
 
-      {/* MD Editor */}
-      <div className="flex-1 overflow-hidden">
-        <MDEditor
-          value={draft.body}
-          onChange={(v: string | undefined) => setDraft(d => ({ ...d, body: v ?? '' }))}
-          height="100%"
-          preview="live"
-          visibleDragbar={false}
-        />
-      </div>
+        <section aria-label="Memory metadata" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <MetaItem label="Project" value={optionalValue(memory.project)} />
+          <MetaItem label="Source" value={optionalValue(memory.source)} />
+          <MetaItem label="Lifecycle" value={memory.lifecycle} />
+          <MetaItem label="Expires on" value={optionalValue(memory.expires_on)} />
+          <MetaItem label="Importance" value={String(memory.importance)} />
+          <MetaItem label="Created / updated" value={formatDateRange(memory)} />
+        </section>
 
-      {/* Footer */}
-      <div className="flex items-center gap-3 px-4 py-3 border-t border-white/5 bg-[#111]">
-        {error && <span className="flex-1 text-xs text-red-400">{error}</span>}
-        {!error && isDirty && (
-          <span className="flex-1 text-xs text-white/30">Unsaved changes</span>
-        )}
-        {!error && !isDirty && <span className="flex-1" />}
-        <button
-          onClick={handleDelete}
-          disabled={deleting}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded transition-colors disabled:opacity-40"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          {deleting ? 'Deleting…' : 'Delete'}
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={saving || !isDirty}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white rounded transition-colors disabled:opacity-40"
-        >
-          <Save className="w-3.5 h-3.5" />
-          {saving ? 'Saving…' : 'Save'}
-        </button>
+        <section className="rounded-xl border border-white/8 bg-black/20 p-4">
+          <div className="flex items-center gap-2 text-xs font-medium text-white/50 mb-3">
+            <Tag className="w-3.5 h-3.5" /> Tags
+          </div>
+          {memory.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {memory.tags.map(tag => (
+                <span key={tag} className="rounded-full bg-white/8 px-2 py-1 text-xs text-white/65">{tag}</span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-white/30">No tags.</p>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-white/8 bg-black/20 p-4">
+          <div className="flex items-center gap-2 text-xs font-medium text-white/50 mb-3">
+            <GitBranch className="w-3.5 h-3.5" /> Relationships
+          </div>
+          {memory.relationships.length > 0 ? (
+            <div className="space-y-2">
+              {memory.relationships.map((rel, index) => (
+                <div key={`${rel.target_id}-${rel.type}-${index}`} className="rounded-lg bg-white/5 p-3 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-200 font-mono">{rel.type}</span>
+                    <span className="font-mono text-white/60 break-all">{rel.target_id}</span>
+                  </div>
+                  {rel.note && <p className="mt-2 text-white/45">{rel.note}</p>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-white/30">No relationships.</p>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-white/8 bg-black/20 p-4">
+          <div className="flex items-center gap-2 text-xs font-medium text-white/50 mb-3">
+            <Link2 className="w-3.5 h-3.5" /> Legacy links
+          </div>
+          {memory.links.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {memory.links.map(link => (
+                <span key={link} className="rounded bg-white/8 px-2 py-1 text-xs font-mono text-white/65">{link}</span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-white/30">No legacy links.</p>
+          )}
+        </section>
+      </main>
+    </div>
+  )
+}
+
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/8 bg-black/20 p-3">
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-white/35">
+        <CalendarDays className="w-3 h-3" /> {label}
       </div>
+      <div className="mt-1 text-sm text-white/75 break-words">{value}</div>
     </div>
   )
 }

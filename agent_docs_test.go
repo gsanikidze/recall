@@ -21,6 +21,7 @@ func TestAgentInstructionArtifactsExist(t *testing.T) {
 				"hermes skills install",
 				"/reload-mcp",
 				"/reload-skills",
+				"read-only web UI",
 			},
 		},
 		{
@@ -36,6 +37,7 @@ func TestAgentInstructionArtifactsExist(t *testing.T) {
 				"docs/examples/hermes-mcp-recall.yaml",
 				"scripts/install-hermes-recall.sh",
 				"scripts/verify-agent-setup.sh",
+				"agent-written, human-readable memory",
 			},
 		},
 		{

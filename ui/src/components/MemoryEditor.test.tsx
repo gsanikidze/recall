@@ -1,123 +1,52 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { MemoryEditor } from './MemoryEditor'
 import type { MemoryDetail } from '@/api/types'
-
-const updateMutate = vi.fn()
-const deleteMutate = vi.fn()
-
-vi.mock('@uiw/react-md-editor', () => ({
-  default: ({ value, onChange }: { value?: string; onChange?: (value?: string) => void }) => (
-    <textarea aria-label="Body" value={value ?? ''} onChange={e => onChange?.(e.target.value)} />
-  ),
-}))
-
-vi.mock('@/queries', () => ({
-  useUpdateMemory: () => ({ mutate: updateMutate, isPending: false }),
-  useDeleteMemory: () => ({ mutate: deleteMutate, isPending: false }),
-}))
 
 function memory(overrides: Partial<MemoryDetail> = {}): MemoryDetail {
   return {
     id: '01MEMORY',
     title: 'Original title',
     domain: 'tools',
-    tags: [],
-    project: '',
+    tags: ['mcp', 'agent-written'],
+    project: 'recall',
     lifecycle: 'evergreen',
     expires_on: '',
     created: '2026-06-08',
-    updated: '2026-06-08',
-    source: '',
-    links: [],
-    relationships: [],
-    importance: 3,
+    updated: '2026-06-09',
+    source: 'Hermes Agent',
+    links: ['01LINK'],
+    relationships: [{ target_id: '01TARGET000000000000000001', type: 'uses_tool', note: 'via MCP' }],
+    importance: 4,
     path: 'tools/original.md',
-    body: 'Original body',
+    body: 'Original **body**',
     ...overrides,
   }
 }
 
-describe('MemoryEditor expiry validation', () => {
-  beforeEach(() => {
-    updateMutate.mockReset()
-    deleteMutate.mockReset()
-  })
-
-  it('blocks save when lifecycle expires has no date and shows inline error', async () => {
-    const user = userEvent.setup()
-    render(<MemoryEditor memory={memory()} onSaved={vi.fn()} onDeleted={vi.fn()} />)
-
-    await user.click(screen.getByRole('button', { name: /metadata/i }))
-    await user.selectOptions(screen.getByLabelText(/lifecycle/i), 'expires')
-    await user.clear(screen.getByRole('textbox', { name: /memory title/i }))
-    await user.type(screen.getByRole('textbox', { name: /memory title/i }), 'Changed title')
-    await user.click(screen.getByRole('button', { name: /^save$/i }))
-
-    expect(updateMutate).not.toHaveBeenCalled()
-    expect(screen.getByText(/expiry date is required/i)).toBeInTheDocument()
-  })
-
-  it('clears expires_on before saving evergreen memories', async () => {
-    const user = userEvent.setup()
-    render(<MemoryEditor memory={memory({ lifecycle: 'expires', expires_on: '2026-12-31' })} onSaved={vi.fn()} onDeleted={vi.fn()} />)
-
-    await user.click(screen.getByRole('button', { name: /metadata/i }))
-    await user.selectOptions(screen.getByLabelText(/lifecycle/i), 'evergreen')
-    await user.clear(screen.getByRole('textbox', { name: /memory title/i }))
-    await user.type(screen.getByRole('textbox', { name: /memory title/i }), 'Evergreen now')
-    await user.click(screen.getByRole('button', { name: /^save$/i }))
-
-    expect(updateMutate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        params: expect.objectContaining({ lifecycle: 'evergreen', expires_on: '' }),
-      }),
-      expect.any(Object),
-    )
-  })
-
-  it('notifies dirty state and guards browser unload', async () => {
-    const user = userEvent.setup()
+describe('MemoryEditor read-only viewer', () => {
+  it('presents memory data as read-only agent-written content', () => {
     const onDirtyChange = vi.fn()
-    render(<MemoryEditor memory={memory()} onSaved={vi.fn()} onDeleted={vi.fn()} onDirtyChange={onDirtyChange} />)
 
-    await user.clear(screen.getByRole('textbox', { name: /memory title/i }))
-    await user.type(screen.getByRole('textbox', { name: /memory title/i }), 'Unsaved title')
+    render(<MemoryEditor memory={memory()} onDirtyChange={onDirtyChange} />)
 
-    expect(onDirtyChange).toHaveBeenLastCalledWith(true)
-
-    const event = new Event('beforeunload', { cancelable: true })
-    window.dispatchEvent(event)
-    expect(event.defaultPrevented).toBe(true)
-  })
-
-  it('saves changed importance from metadata panel', async () => {
-    const user = userEvent.setup()
-    render(<MemoryEditor memory={memory({ importance: 3 })} onSaved={vi.fn()} onDeleted={vi.fn()} />)
-
-    await user.click(screen.getByRole('button', { name: /metadata/i }))
-    await user.selectOptions(screen.getByLabelText(/importance/i), '5')
-    await user.click(screen.getByRole('button', { name: /^save$/i }))
-
-    expect(updateMutate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        params: expect.objectContaining({ importance: 5 }),
-      }),
-      expect.any(Object),
-    )
-  })
-
-  it('shows typed relationships in metadata panel', async () => {
-    const user = userEvent.setup()
-    render(<MemoryEditor memory={memory({
-      relationships: [{ target_id: '01TARGET000000000000000001', type: 'uses_tool', note: 'via MCP' }],
-    })} onSaved={vi.fn()} onDeleted={vi.fn()} />)
-
-    await user.click(screen.getByRole('button', { name: /metadata/i }))
-
-    expect(screen.getByText(/uses_tool/i)).toBeInTheDocument()
-    expect(screen.getByText(/01TARGET000000000000000001/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Original title' })).toBeInTheDocument()
+    expect(screen.getByText(/agent-written memory/i)).toBeInTheDocument()
+    expect(screen.getByText('tools/original.md')).toBeInTheDocument()
+    expect(screen.getByText('Original **body**')).toBeInTheDocument()
+    expect(screen.getByText('recall')).toBeInTheDocument()
+    expect(screen.getByText('Hermes Agent')).toBeInTheDocument()
+    expect(screen.getByText('uses_tool')).toBeInTheDocument()
     expect(screen.getByText(/via MCP/i)).toBeInTheDocument()
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false)
+  })
+
+  it('does not expose save delete or body editing controls', () => {
+    render(<MemoryEditor memory={memory()} />)
+
+    expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: /body/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: /memory title/i })).not.toBeInTheDocument()
   })
 })

@@ -2,6 +2,8 @@
 
 This guide gives LLM agents enough information to install and verify Recall as long-lived local memory.
 
+Product stance: Recall is agent-written, human-readable memory. Use CLI/MCP/API for writes; use the web UI mainly to browse, search, view metadata, and audit what agents stored.
+
 ## Files in this repo
 
 | Path | Purpose |

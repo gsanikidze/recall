@@ -2,6 +2,8 @@
 
 This repository contains Recall, a local-first memory CLI/web UI/MCP server for humans and LLM agents. Use this file as the first thing an agent reads when setting up or working on Recall.
 
+Current product stance: agents/scripts write structured durable memories through CLI/MCP/API; humans mostly browse, search, and audit stored data in the read-only web UI.
+
 ## What Recall provides
 
 - Markdown vault as source of truth.
