@@ -1,10 +1,100 @@
 # Recall
 
-Recall is a local-first memory layer for AI agents. Agents write structured durable facts through CLI/MCP/API, humans inspect them through a read-only web UI, and everything stays stored as Markdown plus a rebuildable local SQLite index.
+Recall is a local-first memory layer for AI agents: **Markdown for humans, SQLite for search, MCP for agents.**
+
+Agents write structured durable facts through CLI/MCP/API. Humans browse, search, inspect, and audit those memories through a read/view-first UI. The source of truth stays as Markdown on your machine; SQLite is a rebuildable local index.
+
+> Agents write. Humans inspect. Recall indexes. MCP retrieves.
 
 ## Status
 
-Recall is early-stage. Storage is local device only: no cloud sync, no hosted service, no remote database.
+**Alpha.** Recall is early local-first memory infrastructure for agents, not a finished product and not a hosted service.
+
+Storage is local device only: no cloud sync, no hosted API, no remote database, no multi-user collaboration layer.
+
+## Why Recall exists
+
+AI agents lose context between sessions, tools, and products. Recall gives them a durable, portable, inspectable memory layer:
+
+- **Local-first memory** — data lives on your machine, not a cloud SaaS.
+- **Markdown source of truth** — humans can inspect and manually fix memories when needed.
+- **SQLite index** — agents can search/filter quickly without parsing the whole vault every time.
+- **MCP interface** — Hermes, Claude, Codex, or other MCP clients can use the same memory tools.
+- **CLI + TUI + read-only web UI** — scriptable for agents, inspectable for humans.
+- **Agent setup docs/skills/scripts** — practical bootstrap path, not only a library.
+
+## What Recall is not
+
+Recall is intentionally **not**:
+
+- production-ready;
+- universal memory for every app;
+- a Mem0, Letta, LangGraph Memory, Chroma, or sqlite-vec replacement;
+- an Obsidian replacement;
+- an “agent OS”;
+- a hosted team memory service.
+
+It is experimental, hackable, Markdown-native, MCP-ready agent memory infrastructure.
+
+## Who it is for
+
+Good fit:
+
+- Hermes / Claude / Codex power users;
+- local-first and privacy-focused AI users;
+- Obsidian + AI users who want agent-readable structure;
+- developers building personal agents;
+- people tired of agent context loss.
+
+Bad fit:
+
+- no-code users;
+- teams expecting hosted sync/cloud/collaboration;
+- enterprise deployments;
+- users expecting a polished notes app UI;
+- anyone who wants human-first note editing as the main workflow.
+
+## Why not just Obsidian?
+
+Obsidian is human-first. Recall is agent-first but human-readable.
+
+Recall adds:
+
+- structured frontmatter;
+- domains;
+- lifecycle and importance metadata;
+- typed relationships;
+- MCP tools for agents;
+- searchable SQLite index;
+- rebuild/reindex flow;
+- agent policies and setup templates.
+
+Markdown remains the source of truth, so manual editing is still an advanced escape hatch. The product path is not “better notes app”; it is durable memory infrastructure agents can write and humans can audit.
+
+## Quickstart in 3 minutes
+
+```bash
+# 1. Build Recall
+make build
+
+# 2. Create a local memory project
+./bin/recall init --path ~/brain
+
+# 3. Add a memory through the CLI
+RECALL_PROJECT=$HOME/brain ./bin/recall add \
+  --title "Use local-first agent memory" \
+  --domain decisions \
+  --importance 4 \
+  --body "Recall stores agent-written durable memory as Markdown plus a SQLite index."
+
+# 4. Search it
+RECALL_PROJECT=$HOME/brain ./bin/recall search "local-first agent memory"
+
+# 5. Inspect in the read/view-first UI
+RECALL_PROJECT=$HOME/brain ./bin/recall ui --port 8888
+```
+
+For MCP setup, see [MCP setup](#mcp-setup) and [LLM setup](docs/llm-setup.md).
 
 ## What it stores
 
@@ -14,7 +104,7 @@ A Recall project contains:
 - `db/recall.sqlite` — rebuildable SQLite search/index database.
 - `vault/README.md` and per-domain `README.md` files — human/agent guidance for what belongs where.
 
-Default domains include `tools`, `inbox`, `people`, `projects`, `decisions`, `research`, and `goals`. Add custom domains with `recall domain add` or from the UI. Memories are intended to be written by agents or scripts through CLI/MCP/API; the web UI is read/view-first so humans can audit what was stored.
+Default domains include `tools`, `inbox`, `people`, `projects`, `decisions`, `research`, and `goals`. Add custom domains with `recall domain add`. Memories are intended to be written by agents or scripts through CLI/MCP/API; the web UI is read/view-first so humans can audit what was stored.
 
 ## Install / build
 
@@ -280,6 +370,17 @@ Recall is local-first and assumes local device trust, not hostile multi-user hos
 - API middleware rejects non-loopback hostnames to reduce DNS-rebinding risk.
 - CORS allowlist is limited to local Vite dev origins (`localhost:5173`, `127.0.0.1:5173`).
 - Do not expose Recall’s API port to LAN/WAN or run it behind public reverse proxies without adding authentication.
+
+## Roadmap
+
+Near-term polish before wider launch:
+
+- screenshot/GIF of CLI + read/view-first UI;
+- stronger example showing an agent remembering a project decision across sessions;
+- more copy-paste MCP configs for popular clients;
+- relationship graph browsing;
+- safer review workflow for agent-written memories;
+- optional sync/export story without making cloud required.
 
 ## More docs
 
