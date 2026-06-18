@@ -16,6 +16,7 @@ import (
 	"recall/internal/index"
 	"recall/internal/memory"
 	"recall/internal/recall"
+	"recall/internal/view"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -35,8 +36,6 @@ type ProjectOut struct {
 	VaultPath   string `json:"vault_path"`
 	DBPath      string `json:"db_path"`
 }
-
-type projectOut = ProjectOut
 
 // register wires every tool onto the server.
 func register(server *mcp.Server, e *recall.Engine, switchers ...ProjectSwitcher) {
@@ -145,36 +144,9 @@ type searchOut struct {
 	Hits []hitOut `json:"hits"`
 }
 
-func mcpSearchMode(raw string) (index.SearchMode, error) {
-	switch strings.TrimSpace(raw) {
-	case "", "keyword":
-		return index.SearchModeKeyword, nil
-	case "semantic":
-		return index.SearchModeSemantic, nil
-	case "hybrid":
-		return index.SearchModeHybrid, nil
-	default:
-		return "", fmt.Errorf("mcp: unknown search mode %q", raw)
-	}
-}
-
-func mcpEmbeddingProvider(name, model, baseURL string) (embedding.Provider, error) {
-	if strings.TrimSpace(model) == "" {
-		return nil, fmt.Errorf("mcp: model is required")
-	}
-	switch strings.TrimSpace(name) {
-	case "ollama":
-		return embedding.NewOllamaProvider(baseURL, model), nil
-	case "fake":
-		return embedding.NewFakeProvider(model, 32), nil
-	default:
-		return nil, fmt.Errorf("mcp: unknown provider %q", name)
-	}
-}
-
 func searchHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest, searchArgs) (*mcp.CallToolResult, searchOut, error) {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, a searchArgs) (*mcp.CallToolResult, searchOut, error) {
-		mode, err := mcpSearchMode(a.Mode)
+		mode, err := index.ParseSearchMode(a.Mode)
 		if err != nil {
 			return nil, searchOut{}, err
 		}
@@ -203,7 +175,7 @@ func searchHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest,
 			if baseURL == "" {
 				baseURL = os.Getenv("RECALL_OLLAMA_URL")
 			}
-			provider, err := mcpEmbeddingProvider(providerName, model, baseURL)
+			provider, err := embedding.NewProvider(providerName, model, baseURL)
 			if err != nil {
 				return nil, searchOut{}, err
 			}
@@ -240,36 +212,13 @@ type getArgs struct {
 	ID string `json:"id" jsonschema:"the memory id"`
 }
 
-type getOut struct {
-	ID            string                `json:"id"`
-	Title         string                `json:"title"`
-	Domain        string                `json:"domain"`
-	Tags          []string              `json:"tags,omitempty"`
-	Project       string                `json:"project,omitempty"`
-	Lifecycle     string                `json:"lifecycle"`
-	ExpiresOn     string                `json:"expires_on,omitempty"`
-	Created       string                `json:"created"`
-	Updated       string                `json:"updated"`
-	Source        string                `json:"source,omitempty"`
-	Links         []string              `json:"links,omitempty"`
-	Relationships []memory.Relationship `json:"relationships,omitempty"`
-	Importance    int                   `json:"importance"`
-	Path          string                `json:"path"`
-	Body          string                `json:"body"`
-}
-
-func getHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest, getArgs) (*mcp.CallToolResult, getOut, error) {
-	return func(ctx context.Context, _ *mcp.CallToolRequest, a getArgs) (*mcp.CallToolResult, getOut, error) {
+func getHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest, getArgs) (*mcp.CallToolResult, view.Memory, error) {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, a getArgs) (*mcp.CallToolResult, view.Memory, error) {
 		m, relPath, err := e.Get(ctx, a.ID)
 		if err != nil {
-			return nil, getOut{}, err
+			return nil, view.Memory{}, err
 		}
-		out := getOut{
-			ID: m.ID, Title: m.Title, Domain: m.Domain, Tags: m.Tags, Project: m.Project,
-			Lifecycle: string(m.Lifecycle), ExpiresOn: m.ExpiresOn.String(),
-			Created: m.Created.String(), Updated: m.Updated.String(),
-			Source: m.Source, Links: m.Links, Relationships: m.Relationships, Importance: m.Importance, Path: relPath, Body: m.Body,
-		}
+		out := view.FromMemory(m, relPath)
 		return jsonResult(out), out, nil
 	}
 }

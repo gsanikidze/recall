@@ -15,6 +15,7 @@ import (
 	"recall/internal/index"
 	"recall/internal/memory"
 	"recall/internal/recall"
+	"recall/internal/view"
 )
 
 // Add creates a memory from flags. The body may be passed with --body or piped
@@ -133,24 +134,13 @@ func parseEmbedArgs(args []string) (embedArgs, error) {
 	return parsed, nil
 }
 
-func embeddingProviderFromArgs(args embedArgs) (embedding.Provider, error) {
-	switch args.provider {
-	case "ollama":
-		return embedding.NewOllamaProvider(args.baseURL, args.model), nil
-	case "fake":
-		return embedding.NewFakeProvider(args.model, 32), nil
-	default:
-		return nil, fmt.Errorf("embed: unknown provider %q", args.provider)
-	}
-}
-
 // Embed computes embedding vectors for indexed memories and stores them in SQLite.
 func Embed(args []string) error {
 	parsed, err := parseEmbedArgs(args)
 	if err != nil {
 		return err
 	}
-	provider, err := embeddingProviderFromArgs(parsed)
+	provider, err := embedding.NewProvider(parsed.provider, parsed.model, parsed.baseURL)
 	if err != nil {
 		return err
 	}
@@ -189,7 +179,7 @@ func Search(args []string) error {
 	defer e.Close()
 
 	if parsed.filter.Mode == index.SearchModeSemantic || parsed.filter.Mode == index.SearchModeHybrid {
-		provider, err := searchEmbeddingProvider(parsed)
+		provider, err := embedding.NewProvider(parsed.provider, parsed.model, parsed.baseURL)
 		if err != nil {
 			return err
 		}
@@ -230,30 +220,6 @@ type searchArgs struct {
 	model    string
 	baseURL  string
 	json     bool
-}
-
-func searchEmbeddingProvider(args searchArgs) (embedding.Provider, error) {
-	switch args.provider {
-	case "ollama":
-		return embedding.NewOllamaProvider(args.baseURL, args.model), nil
-	case "fake":
-		return embedding.NewFakeProvider(args.model, 32), nil
-	default:
-		return nil, fmt.Errorf("search: unknown provider %q", args.provider)
-	}
-}
-
-func parseSearchMode(raw string) (index.SearchMode, error) {
-	switch strings.TrimSpace(raw) {
-	case "", "keyword":
-		return index.SearchModeKeyword, nil
-	case "semantic":
-		return index.SearchModeSemantic, nil
-	case "hybrid":
-		return index.SearchModeHybrid, nil
-	default:
-		return "", fmt.Errorf("search: unknown mode %q", raw)
-	}
 }
 
 func setSearchMode(current *index.SearchMode, next index.SearchMode) error {
@@ -297,7 +263,7 @@ func parseSearchArgs(args []string) (searchArgs, error) {
 			if err != nil {
 				return parsed, err
 			}
-			mode, err := parseSearchMode(v)
+			mode, err := index.ParseSearchMode(v)
 			if err != nil {
 				return parsed, err
 			}
@@ -417,7 +383,7 @@ func Get(args []string) error {
 		return err
 	}
 	if jsonOut {
-		return printJSON(memoryOutput(m, relPath))
+		return printJSON(view.FromMemory(m, relPath))
 	}
 	data, err := os.ReadFile(filepath.Join(e.Vault().Root(), relPath))
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -436,7 +437,7 @@ func TestSearchRejectsInvalidFilters(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected validation error")
 			}
-			if !contains(err.Error(), tc.wantErr) {
+			if !strings.Contains(err.Error(), tc.wantErr) {
 				t.Fatalf("error %q missing %q", err.Error(), tc.wantErr)
 			}
 		})
@@ -665,26 +666,13 @@ func TestStripMarkdown(t *testing.T) {
 	in := "# Heading\n\nUse `kamal` and [the docs](http://x). **Bold** and [[wiki]].\n\n- item one\n- item two"
 	got := StripMarkdown(in)
 	for _, banned := range []string{"#", "`", "**", "](", "[[", "- "} {
-		if contains(got, banned) {
+		if strings.Contains(got, banned) {
 			t.Errorf("stripped text still contains %q:\n%s", banned, got)
 		}
 	}
 	for _, want := range []string{"Heading", "kamal", "the docs", "Bold", "wiki", "item one"} {
-		if !contains(got, want) {
+		if !strings.Contains(got, want) {
 			t.Errorf("stripped text missing %q:\n%s", want, got)
 		}
 	}
-}
-
-func contains(s, sub string) bool {
-	return len(sub) > 0 && len(s) >= len(sub) && (indexOf(s, sub) >= 0)
-}
-
-func indexOf(s, sub string) int {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
-		}
-	}
-	return -1
 }

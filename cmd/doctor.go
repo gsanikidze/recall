@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type doctorReport struct {
@@ -83,10 +84,10 @@ func Doctor(args []string) error {
 }
 
 func currentProjectPath() (string, error) {
-	if override := os.Getenv("RECALL_PROJECT"); override != "" {
+	if override := strings.TrimSpace(os.Getenv("RECALL_PROJECT")); override != "" {
 		return resolvePath(override)
 	}
-	if override := os.Getenv("RECALL_HOME"); override != "" {
+	if override := strings.TrimSpace(os.Getenv("RECALL_HOME")); override != "" {
 		return resolvePath(override)
 	}
 	cfg, found, err := loadConfig()
