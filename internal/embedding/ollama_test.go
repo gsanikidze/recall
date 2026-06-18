@@ -85,7 +85,7 @@ func TestOllamaProviderReturnsUsefulErrors(t *testing.T) {
 		if err == nil {
 			t.Fatal("Embed succeeded, want error")
 		}
-		if want := "ollama embeddings: status 404"; !contains(err.Error(), want) {
+		if want := "ollama embeddings: status 404"; !strings.Contains(err.Error(), want) {
 			t.Fatalf("error = %q, want substring %q", err.Error(), want)
 		}
 	})
@@ -101,12 +101,8 @@ func TestOllamaProviderReturnsUsefulErrors(t *testing.T) {
 		if err == nil {
 			t.Fatal("Embed succeeded, want error")
 		}
-		if want := "empty embedding"; !contains(err.Error(), want) {
+		if want := "empty embedding"; !strings.Contains(err.Error(), want) {
 			t.Fatalf("error = %q, want substring %q", err.Error(), want)
 		}
 	})
-}
-
-func contains(s, sub string) bool {
-	return strings.Contains(s, sub)
 }

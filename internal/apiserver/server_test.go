@@ -15,6 +15,7 @@ import (
 	"recall/internal/embedding"
 	"recall/internal/memory"
 	"recall/internal/recall"
+	"recall/internal/view"
 )
 
 func newTestApp(t *testing.T) (*recall.Engine, *fiber.App) {
@@ -141,7 +142,7 @@ func TestMemoryCRUDHappyPath(t *testing.T) {
 	if get.StatusCode != http.StatusOK {
 		t.Fatalf("get status = %d, want 200", get.StatusCode)
 	}
-	var got memoryJSON
+	var got view.Memory
 	decodeJSON(t, get, &got)
 	if got.Title != "API memory" || got.Body == "" || got.Path == "" || got.Importance != 5 {
 		t.Fatalf("get body = %+v", got)
@@ -166,7 +167,7 @@ func TestMemoryCRUDHappyPath(t *testing.T) {
 	if update.StatusCode != http.StatusOK {
 		t.Fatalf("update status = %d, want 200", update.StatusCode)
 	}
-	var updated memoryJSON
+	var updated view.Memory
 	decodeJSON(t, update, &updated)
 	if updated.Importance != 4 {
 		t.Fatalf("updated importance = %d, want 4", updated.Importance)

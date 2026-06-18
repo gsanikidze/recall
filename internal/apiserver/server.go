@@ -18,6 +18,7 @@ import (
 	"recall/internal/memory"
 	"recall/internal/recall"
 	"recall/internal/vault"
+	"recall/internal/view"
 )
 
 // allowedOrigins is the strict CORS allowlist (Vite dev server only).
@@ -75,24 +76,6 @@ type hitJSON struct {
 	Score         float64 `json:"score"`
 	KeywordScore  float64 `json:"keyword_score,omitempty"`
 	SemanticScore float64 `json:"semantic_score,omitempty"`
-}
-
-type memoryJSON struct {
-	ID            string                `json:"id"`
-	Title         string                `json:"title"`
-	Domain        string                `json:"domain"`
-	Tags          []string              `json:"tags"`
-	Project       string                `json:"project"`
-	Lifecycle     string                `json:"lifecycle"`
-	ExpiresOn     string                `json:"expires_on"`
-	Created       string                `json:"created"`
-	Updated       string                `json:"updated"`
-	Source        string                `json:"source"`
-	Links         []string              `json:"links"`
-	Relationships []memory.Relationship `json:"relationships"`
-	Importance    int                   `json:"importance"`
-	Path          string                `json:"path"`
-	Body          string                `json:"body"`
 }
 
 type statusJSON struct {
@@ -162,7 +145,7 @@ func (s *server) listMemories(c *fiber.Ctx) error {
 			tags = append(tags, p)
 		}
 	}
-	mode, err := parseSearchMode(c.Query("mode", "keyword"))
+	mode, err := index.ParseSearchMode(c.Query("mode", "keyword"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -182,7 +165,7 @@ func (s *server) listMemories(c *fiber.Ctx) error {
 		providerName := strings.TrimSpace(c.Query("provider", "ollama"))
 		model := strings.TrimSpace(c.Query("model", embedding.DefaultOllamaModel))
 		baseURL := strings.TrimSpace(c.Query("base_url", os.Getenv("RECALL_OLLAMA_URL")))
-		provider, err := apiEmbeddingProvider(providerName, model, baseURL)
+		provider, err := embedding.NewProvider(providerName, model, baseURL)
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -216,7 +199,7 @@ func (s *server) getMemory(c *fiber.Ctx) error {
 	if err != nil {
 		return errResp(c, err)
 	}
-	return c.JSON(toMemoryJSON(m, relPath))
+	return c.JSON(view.FromMemory(m, relPath))
 }
 
 func (s *server) createMemory(c *fiber.Ctx) error {
@@ -276,7 +259,7 @@ func (s *server) updateMemory(c *fiber.Ctx) error {
 	if err != nil {
 		return validationOrErrResp(c, err)
 	}
-	return c.JSON(toMemoryJSON(m, relPath))
+	return c.JSON(view.FromMemory(m, relPath))
 }
 
 func (s *server) deleteMemory(c *fiber.Ctx) error {
@@ -299,54 +282,6 @@ func (s *server) reindex(c *fiber.Ctx) error {
 }
 
 // ---- helpers ----
-
-func parseSearchMode(raw string) (index.SearchMode, error) {
-	switch strings.TrimSpace(raw) {
-	case "", "keyword":
-		return index.SearchModeKeyword, nil
-	case "semantic":
-		return index.SearchModeSemantic, nil
-	case "hybrid":
-		return index.SearchModeHybrid, nil
-	default:
-		return "", fmt.Errorf("api: unknown search mode %q", raw)
-	}
-}
-
-func apiEmbeddingProvider(name, model, baseURL string) (embedding.Provider, error) {
-	if model == "" {
-		return nil, fmt.Errorf("api: model is required")
-	}
-	switch name {
-	case "ollama":
-		return embedding.NewOllamaProvider(baseURL, model), nil
-	case "fake":
-		return embedding.NewFakeProvider(model, 32), nil
-	default:
-		return nil, fmt.Errorf("api: unknown provider %q", name)
-	}
-}
-
-func toMemoryJSON(m memory.Memory, relPath string) memoryJSON {
-	tags := m.Tags
-	if tags == nil {
-		tags = []string{}
-	}
-	links := m.Links
-	if links == nil {
-		links = []string{}
-	}
-	relationships := m.Relationships
-	if relationships == nil {
-		relationships = []memory.Relationship{}
-	}
-	return memoryJSON{
-		ID: m.ID, Title: m.Title, Domain: m.Domain, Tags: tags, Project: m.Project,
-		Lifecycle: string(m.Lifecycle), ExpiresOn: m.ExpiresOn.String(),
-		Created: m.Created.String(), Updated: m.Updated.String(),
-		Source: m.Source, Links: links, Relationships: relationships, Importance: m.Importance, Path: relPath, Body: m.Body,
-	}
-}
 
 func errResp(c *fiber.Ctx, err error) error {
 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})

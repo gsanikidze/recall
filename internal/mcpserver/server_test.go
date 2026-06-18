@@ -10,6 +10,7 @@ import (
 	"recall/internal/index"
 	"recall/internal/memory"
 	"recall/internal/recall"
+	"recall/internal/view"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -125,14 +126,14 @@ func TestMCPToolsListed(t *testing.T) {
 }
 
 func TestMCPUseProjectCallsSwitcher(t *testing.T) {
-	_, s := startTestServerWithEngineAndSwitcher(t, func(ctx context.Context, path string) (projectOut, error) {
+	_, s := startTestServerWithEngineAndSwitcher(t, func(ctx context.Context, path string) (ProjectOut, error) {
 		if path != "/tmp/new-brain" {
 			t.Fatalf("path = %q", path)
 		}
-		return projectOut{ProjectPath: path, VaultPath: path + "/vault", DBPath: path + "/db/recall.sqlite"}, nil
+		return ProjectOut{ProjectPath: path, VaultPath: path + "/vault", DBPath: path + "/db/recall.sqlite"}, nil
 	})
 
-	var out projectOut
+	var out ProjectOut
 	call(t, s, "recall_use_project", map[string]any{"path": "/tmp/new-brain"}, &out)
 	if out.ProjectPath != "/tmp/new-brain" || out.VaultPath != "/tmp/new-brain/vault" || out.DBPath != "/tmp/new-brain/db/recall.sqlite" {
 		t.Fatalf("use project out = %+v", out)
@@ -178,7 +179,7 @@ func TestMCPAddSearchGetFlow(t *testing.T) {
 	}
 
 	// get
-	var got getOut
+	var got view.Memory
 	call(t, s, "recall_get", map[string]any{"id": added.ID}, &got)
 	if got.Title != "Kamal deploy" || got.Domain != "tools" || got.Importance != 5 {
 		t.Fatalf("get = %+v", got)

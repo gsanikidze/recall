@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"recall/internal/embedding"
@@ -132,7 +133,7 @@ func TestAddGetSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading vault file: %v", err)
 	}
-	if !contains(string(data), "**Kamal**") {
+	if !strings.Contains(string(data), "**Kamal**") {
 		t.Errorf("vault file lost markdown formatting:\n%s", data)
 	}
 
@@ -504,16 +505,7 @@ func TestReindexRejectsDuplicateMemoryIDs(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected duplicate id error")
 	}
-	if !contains(err.Error(), m1.ID) || !contains(err.Error(), firstPath) || !contains(err.Error(), secondPath) {
+	if !strings.Contains(err.Error(), m1.ID) || !strings.Contains(err.Error(), firstPath) || !strings.Contains(err.Error(), secondPath) {
 		t.Fatalf("duplicate error missing id or paths: %v", err)
 	}
-}
-
-func contains(s, sub string) bool {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }

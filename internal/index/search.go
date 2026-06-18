@@ -374,6 +374,24 @@ func appendStructuredFilters(b *strings.Builder, args *[]any, f Filter) {
 	}
 }
 
+// ErrUnknownSearchMode is returned by ParseSearchMode for unrecognized mode strings.
+var ErrUnknownSearchMode = errors.New("index: unknown search mode")
+
+// ParseSearchMode resolves a user-supplied mode string ("", "keyword", "semantic",
+// "hybrid") into a SearchMode. An empty string defaults to keyword.
+func ParseSearchMode(raw string) (SearchMode, error) {
+	switch strings.TrimSpace(raw) {
+	case "", "keyword":
+		return SearchModeKeyword, nil
+	case "semantic":
+		return SearchModeSemantic, nil
+	case "hybrid":
+		return SearchModeHybrid, nil
+	default:
+		return "", fmt.Errorf("%w: %q", ErrUnknownSearchMode, raw)
+	}
+}
+
 func validateFilter(f Filter) error {
 	if f.Mode != "" && f.Mode != SearchModeKeyword && f.Mode != SearchModeSemantic && f.Mode != SearchModeHybrid {
 		return fmt.Errorf("%w: mode must be 'keyword', 'semantic', or 'hybrid', got %q", ErrInvalidFilter, f.Mode)
