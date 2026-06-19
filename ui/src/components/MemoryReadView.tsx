@@ -1,10 +1,8 @@
-import { useEffect } from 'react'
 import { CalendarDays, GitBranch, Link2, Tag } from 'lucide-react'
 import type { MemoryDetail } from '@/api/types'
 
 interface Props {
   memory: MemoryDetail
-  onDirtyChange?: (dirty: boolean) => void
 }
 
 function optionalValue(value: string | undefined | null) {
@@ -16,11 +14,7 @@ function formatDateRange(memory: MemoryDetail) {
   return `${memory.created} → ${memory.updated}`
 }
 
-export function MemoryEditor({ memory, onDirtyChange }: Props) {
-  useEffect(() => {
-    onDirtyChange?.(false)
-  }, [memory.id, onDirtyChange])
-
+export function MemoryReadView({ memory }: Props) {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[#111]">
       <header className="px-5 py-4 border-b border-white/5">

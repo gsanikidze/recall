@@ -1,4 +1,4 @@
-import { Layers, Plus, RefreshCw } from 'lucide-react'
+import { Layers, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Domain } from '@/api/types'
 
@@ -7,12 +7,11 @@ interface Props {
   selected: string | null
   onSelect: (domain: string | null) => void
   onReindex: () => void
-  onAddDomain: () => void
   reindexing: boolean
 }
 
 export function DomainSidebar({
-  domains, selected, onSelect, onReindex, onAddDomain, reindexing,
+  domains, selected, onSelect, onReindex, reindexing,
 }: Props) {
   return (
     <aside className="flex flex-col h-full bg-[#141414] border-r border-white/5">
@@ -50,12 +49,6 @@ export function DomainSidebar({
 
       {/* Footer actions */}
       <div className="border-t border-white/5 p-2 flex flex-col gap-1">
-        <button
-          onClick={onAddDomain}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs text-white/40 hover:text-white/70 hover:bg-white/5 rounded transition-colors"
-        >
-          <Plus className="w-3 h-3" /> New domain
-        </button>
         <button
           onClick={onReindex}
           disabled={reindexing}

@@ -308,6 +308,102 @@ func TestParseDevArgs(t *testing.T) {
 	}
 }
 
+func TestDoctorDeepJSONReportsVaultIndexDriftAndInvalidFiles(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "brain")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := Init([]string{"--path", project, "--force"}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Add([]string{"--title", "Valid Memory", "--domain", "tools", "--body", "indexed and on disk", "--json"}); err != nil {
+			t.Fatalf("Add valid: %v", err)
+		}
+	})
+	validID := extractJSONField(out, "id")
+	if validID == "" {
+		t.Fatalf("missing valid id in %s", out)
+	}
+
+	out = captureStdout(t, func() {
+		if err := Add([]string{"--title", "Missing File", "--domain", "tools", "--body", "indexed but removed", "--json"}); err != nil {
+			t.Fatalf("Add missing: %v", err)
+		}
+	})
+	missingID := extractJSONField(out, "id")
+	missingPath := strings.TrimPrefix(extractJSONField(out, "path"), "vault/")
+	if missingID == "" || missingPath == "" {
+		t.Fatalf("missing id/path in %s", out)
+	}
+	if err := os.Remove(filepath.Join(project, "vault", missingPath)); err != nil {
+		t.Fatalf("remove indexed file: %v", err)
+	}
+	invalidPath := filepath.Join(project, "vault", "tools", "broken.md")
+	if err := os.WriteFile(invalidPath, []byte("---\nid: not-a-valid-memory\n---\n# broken"), 0o644); err != nil {
+		t.Fatalf("write invalid memory: %v", err)
+	}
+
+	out = captureStdout(t, func() {
+		if err := Doctor([]string{"--json", "--deep"}); err != nil {
+			t.Fatalf("Doctor deep json: %v", err)
+		}
+	})
+	for _, want := range []string{
+		`"ok": false`,
+		`"vault_memories": 1`,
+		`"index_memories": 2`,
+		`"invalid_files"`,
+		`tools/broken.md`,
+		`"stale_index_ids"`,
+		missingID,
+		`"missing_index_paths"`,
+		missingPath,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("doctor deep output missing %q: %s", want, out)
+		}
+	}
+}
+
+func TestDoctorEmbeddingsJSONReportsCoverage(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "brain")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := Init([]string{"--path", project, "--force"}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if err := Add([]string{"--title", "One", "--domain", "tools", "--body", "first"}); err != nil {
+		t.Fatalf("Add one: %v", err)
+	}
+	if err := Add([]string{"--title", "Two", "--domain", "tools", "--body", "second"}); err != nil {
+		t.Fatalf("Add two: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Doctor([]string{"--json", "--embeddings", "--provider", "fake", "--model", "fake-32"}); err != nil {
+			t.Fatalf("Doctor embeddings missing: %v", err)
+		}
+	})
+	for _, want := range []string{`"ok": false`, `"provider": "fake"`, `"model": "fake-32"`, `"embedded": 0`, `"missing": 2`, `"coverage": 0`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("doctor missing embeddings output missing %q: %s", want, out)
+		}
+	}
+
+	if err := Embed([]string{"--provider", "fake", "--model", "fake-32"}); err != nil {
+		t.Fatalf("Embed fake: %v", err)
+	}
+	out = captureStdout(t, func() {
+		if err := Doctor([]string{"--json", "--embeddings", "--provider", "fake", "--model", "fake-32"}); err != nil {
+			t.Fatalf("Doctor embeddings ready: %v", err)
+		}
+	})
+	for _, want := range []string{`"ok": true`, `"embedded": 2`, `"missing": 0`, `"coverage": 1`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("doctor ready embeddings output missing %q: %s", want, out)
+		}
+	}
+}
+
 func TestAddSearchGetDeleteJSONFlow(t *testing.T) {
 	project := filepath.Join(t.TempDir(), "brain")
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())

@@ -259,11 +259,26 @@ func (e *Engine) Graph(ctx context.Context, domain string) (Graph, error) {
 
 // MemoryCount returns the number of indexed memories.
 func (e *Engine) MemoryCount(ctx context.Context) (int, error) {
-	ids, err := e.index.ListIDs(ctx)
+	ids, err := e.IndexedIDs(ctx)
 	if err != nil {
 		return 0, err
 	}
 	return len(ids), nil
+}
+
+// IndexedIDs returns every memory id currently present in the SQLite index.
+func (e *Engine) IndexedIDs(ctx context.Context) ([]string, error) {
+	return e.index.ListIDs(ctx)
+}
+
+// IndexedPath returns the vault-relative path currently indexed for a memory id.
+func (e *Engine) IndexedPath(ctx context.Context, id string) (string, error) {
+	return e.index.Path(ctx, id)
+}
+
+// Embeddings returns stored embeddings for a provider/model pair.
+func (e *Engine) Embeddings(ctx context.Context, provider, model string) ([]index.Embedding, error) {
+	return e.index.Embeddings(ctx, provider, model)
 }
 
 // UpdateParams holds optional edits; only non-nil fields are applied. The

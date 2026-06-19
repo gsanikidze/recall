@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
-import { MemoryEditor } from './MemoryEditor'
+import { describe, expect, it } from 'vitest'
+import { MemoryReadView } from './MemoryReadView'
 import type { MemoryDetail } from '@/api/types'
 
 function memory(overrides: Partial<MemoryDetail> = {}): MemoryDetail {
@@ -24,11 +24,9 @@ function memory(overrides: Partial<MemoryDetail> = {}): MemoryDetail {
   }
 }
 
-describe('MemoryEditor read-only viewer', () => {
+describe('MemoryReadView', () => {
   it('presents memory data as read-only agent-written content', () => {
-    const onDirtyChange = vi.fn()
-
-    render(<MemoryEditor memory={memory()} onDirtyChange={onDirtyChange} />)
+    render(<MemoryReadView memory={memory()} />)
 
     expect(screen.getByRole('heading', { name: 'Original title' })).toBeInTheDocument()
     expect(screen.getByText(/agent-written memory/i)).toBeInTheDocument()
@@ -38,11 +36,10 @@ describe('MemoryEditor read-only viewer', () => {
     expect(screen.getByText('Hermes Agent')).toBeInTheDocument()
     expect(screen.getByText('uses_tool')).toBeInTheDocument()
     expect(screen.getByText(/via MCP/i)).toBeInTheDocument()
-    expect(onDirtyChange).toHaveBeenLastCalledWith(false)
   })
 
-  it('does not expose save delete or body editing controls', () => {
-    render(<MemoryEditor memory={memory()} />)
+  it('does not expose editor-style mutation controls', () => {
+    render(<MemoryReadView memory={memory()} />)
 
     expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()

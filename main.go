@@ -77,7 +77,7 @@ Commands:
   get         Print a memory by id
   delete      Delete a memory by id
   domain      Manage domains: domain list | domain add <name> --desc "..."
-  doctor      Check config, vault, SQLite index, and domains
+  doctor      Check config, vault, SQLite index, and domains (--deep, --embeddings)
   reindex     Rebuild the SQLite index from the vault
   mcp         Run the MCP server (stdio) for LLM agents
   ui          Start the web UI at localhost:8888 (--port N --no-browser)

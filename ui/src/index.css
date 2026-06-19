@@ -16,12 +16,3 @@ body {
   display: flex;
   flex-direction: column;
 }
-
-/* react-md-editor — the library's built-in dark CSS handles text colours once
-   data-color-mode="dark" is on <body>. We only override backgrounds to match
-   our app's dark theme. */
-.w-md-editor { background-color: #161616 !important; border-color: #2a2a2a !important; }
-.w-md-editor-toolbar { background-color: #1c1c1c !important; border-color: #2a2a2a !important; }
-.w-md-editor-content { background-color: #161616 !important; }
-.wmde-markdown { background-color: #161616 !important; }
-.w-md-editor-preview { background-color: #161616 !important; }

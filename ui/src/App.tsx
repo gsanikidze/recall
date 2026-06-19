@@ -1,16 +1,14 @@
 import { lazy, Suspense, useState, useCallback } from 'react'
 import { Routes, Route, useParams, useNavigate, useLocation } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { Layout } from '@/components/Layout'
 import { DomainSidebar } from '@/components/DomainSidebar'
 import { MemoryList } from '@/components/MemoryList'
-import { NewDomainDialog } from '@/components/NewDomainDialog'
-import { useDomains, useStatus, useMemories, useMemory, useGraph, useReindex, keys } from '@/queries'
+import { useDomains, useStatus, useMemories, useMemory, useGraph, useReindex } from '@/queries'
 import { useDebounce } from '@/lib/useDebounce'
 import { domainRoute, memoryRoute, graphRoute, routeParam } from '@/lib/routes'
 import type { MemoryFilter, SearchMode } from '@/api/types'
 
-const MemoryEditor = lazy(() => import('@/components/MemoryEditor').then(module => ({ default: module.MemoryEditor })))
+const MemoryReadView = lazy(() => import('@/components/MemoryReadView').then(module => ({ default: module.MemoryReadView })))
 const GraphView = lazy(() => import('@/components/GraphView').then(module => ({ default: module.GraphView })))
 
 function AppShell() {
@@ -19,12 +17,9 @@ function AppShell() {
   const id = routeParam(params.id)
   const navigate = useNavigate()
   const location = useLocation()
-  const qc = useQueryClient()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [searchMode, setSearchMode] = useState<SearchMode>('keyword')
-  const [showNewDomain, setShowNewDomain] = useState(false)
-  const [editorDirty, setEditorDirty] = useState(false)
 
   const debouncedQuery = useDebounce(searchQuery, 300)
   const isGraph = location.pathname === '/graph' || location.pathname.endsWith('/graph')
@@ -45,81 +40,62 @@ function AppShell() {
   const reindexMutation = useReindex()
 
   const guardedNavigate = useCallback((to: string, options?: { replace?: boolean }) => {
-    if (editorDirty && !window.confirm('Discard unsaved changes?')) return
-    setEditorDirty(false)
     navigate(to, options)
-  }, [editorDirty, navigate])
-
-  const handleDomainCreated = useCallback((name: string) => {
-    setShowNewDomain(false)
-    qc.invalidateQueries({ queryKey: keys.domains() })
-    guardedNavigate(domainRoute(name))
-  }, [guardedNavigate, qc])
+  }, [navigate])
 
   return (
-    <>
-      <Layout
-        projectPath={status?.project_path}
-        sidebar={
-          <DomainSidebar
-            domains={domains}
-            selected={domain ?? null}
-            onSelect={d => guardedNavigate(domainRoute(d))}
-            onReindex={() => reindexMutation.mutate(undefined)}
-            onAddDomain={() => setShowNewDomain(true)}
-            reindexing={reindexMutation.isPending}
-          />
-        }
-        list={
-          isGraph ? null : (
-            <MemoryList
-              memories={memories}
-              loading={isLoading}
-              selectedId={id ?? null}
-              searchQuery={searchQuery}
-              searchMode={searchMode}
-              onSearchChange={setSearchQuery}
-              onSearchModeChange={setSearchMode}
-              onSelect={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
-              onGraph={() => guardedNavigate(graphRoute(domain ?? null))}
-              graphSelected={isGraph}
-            />
-          )
-        }
-        editor={
-          isGraph ? (
-            <Suspense fallback={<div className="flex items-center justify-center h-full text-white/30 text-sm">Loading graph…</div>}>
-              <GraphView
-                graph={graph}
-                loading={graphLoading}
-                error={graphError instanceof Error ? graphError : null}
-                onSelectMemory={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
-              />
-            </Suspense>
-          ) : selectedMemory ? (
-            <Suspense fallback={<div className="flex items-center justify-center h-full text-white/30 text-sm">Loading editor…</div>}>
-              <MemoryEditor
-                key={selectedMemory.id}
-                memory={selectedMemory}
-                onDirtyChange={setEditorDirty}
-              />
-            </Suspense>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-white/20 text-sm gap-2">
-              <span>Select a memory to view</span>
-              <span className="text-xs">agent-written context appears here read-only</span>
-            </div>
-          )
-        }
-      />
-
-      {showNewDomain && (
-        <NewDomainDialog
-          onCreated={handleDomainCreated}
-          onClose={() => setShowNewDomain(false)}
+    <Layout
+      projectPath={status?.project_path}
+      sidebar={
+        <DomainSidebar
+          domains={domains}
+          selected={domain ?? null}
+          onSelect={d => guardedNavigate(domainRoute(d))}
+          onReindex={() => reindexMutation.mutate(undefined)}
+          reindexing={reindexMutation.isPending}
         />
-      )}
-    </>
+      }
+      list={
+        isGraph ? null : (
+          <MemoryList
+            memories={memories}
+            loading={isLoading}
+            selectedId={id ?? null}
+            searchQuery={searchQuery}
+            searchMode={searchMode}
+            onSearchChange={setSearchQuery}
+            onSearchModeChange={setSearchMode}
+            onSelect={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
+            onGraph={() => guardedNavigate(graphRoute(domain ?? null))}
+            graphSelected={isGraph}
+          />
+        )
+      }
+      editor={
+        isGraph ? (
+          <Suspense fallback={<div className="flex items-center justify-center h-full text-white/30 text-sm">Loading graph…</div>}>
+            <GraphView
+              graph={graph}
+              loading={graphLoading}
+              error={graphError instanceof Error ? graphError : null}
+              onSelectMemory={memId => guardedNavigate(memoryRoute(domain ?? null, memId))}
+            />
+          </Suspense>
+        ) : selectedMemory ? (
+          <Suspense fallback={<div className="flex items-center justify-center h-full text-white/30 text-sm">Loading memory…</div>}>
+            <MemoryReadView
+              key={selectedMemory.id}
+              memory={selectedMemory}
+            />
+          </Suspense>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-white/20 text-sm gap-2">
+            <span>Select a memory to view</span>
+            <span className="text-xs">agent-written context appears here read-only</span>
+          </div>
+        )
+      }
+    />
   )
 }
 
