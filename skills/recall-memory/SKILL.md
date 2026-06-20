@@ -44,6 +44,7 @@ Skip credentials, tokens, one-off command output, commit SHAs, PR numbers, issue
 - `recall_get`
 - `recall_add`
 - `recall_update`
+- `recall_graph`
 - `recall_list_domains`
 - `recall_reindex`
 

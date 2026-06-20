@@ -100,6 +100,7 @@ Expected tools:
 ```text
 recall_add
 recall_get
+recall_graph
 recall_list_domains
 recall_reindex
 recall_search

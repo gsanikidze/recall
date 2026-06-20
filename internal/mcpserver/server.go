@@ -82,6 +82,13 @@ func register(server *mcp.Server, e *recall.Engine, switchers ...ProjectSwitcher
 	}, reindexHandler(e))
 
 	mcp.AddTool(server, &mcp.Tool{
+		Name: "recall_graph",
+		Description: "Return typed memory relationships as a node/edge graph. " +
+			"Optionally pass domain to include edges whose source memory is in that domain; " +
+			"targets are still included so relationships remain visible.",
+	}, graphHandler(e))
+
+	mcp.AddTool(server, &mcp.Tool{
 		Name: "recall_use_project",
 		Description: "Change the saved Recall project directory. Existing files are preserved; missing " +
 			"vault/ and db/ scaffold directories are created. New MCP sessions use the new directory.",
@@ -332,6 +339,22 @@ func reindexHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest
 		}
 		out := reindexOut{Indexed: stats.Indexed, Deleted: stats.Deleted}
 		return jsonResult(out), out, nil
+	}
+}
+
+// ---- recall_graph ----
+
+type graphArgs struct {
+	Domain string `json:"domain,omitempty" jsonschema:"restrict to edges whose source memory is in this domain"`
+}
+
+func graphHandler(e *recall.Engine) func(context.Context, *mcp.CallToolRequest, graphArgs) (*mcp.CallToolResult, recall.Graph, error) {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, a graphArgs) (*mcp.CallToolResult, recall.Graph, error) {
+		graph, err := e.Graph(ctx, strings.TrimSpace(a.Domain))
+		if err != nil {
+			return nil, recall.Graph{}, err
+		}
+		return jsonResult(graph), graph, nil
 	}
 }
 

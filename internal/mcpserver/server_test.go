@@ -111,7 +111,7 @@ func TestMCPToolsListed(t *testing.T) {
 	want := map[string]bool{
 		"recall_search": false, "recall_get": false, "recall_add": false,
 		"recall_update": false, "recall_list_domains": false, "recall_reindex": false,
-		"recall_use_project": false,
+		"recall_use_project": false, "recall_graph": false,
 	}
 	for _, tool := range res.Tools {
 		if _, ok := want[tool.Name]; ok {
@@ -122,6 +122,80 @@ func TestMCPToolsListed(t *testing.T) {
 		if !found {
 			t.Errorf("tool %q not registered", name)
 		}
+	}
+}
+
+func TestMCPGraphReturnsRelationshipGraph(t *testing.T) {
+	e, s := startTestServerWithEngine(t)
+	ctx := context.Background()
+
+	target, _, err := e.Add(ctx, recall.AddParams{Title: "Recall MCP", Body: "MCP server for agents", Domain: "tools"})
+	if err != nil {
+		t.Fatalf("Add target: %v", err)
+	}
+	source, _, err := e.Add(ctx, recall.AddParams{
+		Title:  "Hermes integration",
+		Body:   "Hermes uses Recall MCP.",
+		Domain: "projects",
+		Relationships: []memory.Relationship{{
+			TargetID: target.ID,
+			Type:     memory.RelationshipUsesTool,
+			Note:     "agent graph",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Add source: %v", err)
+	}
+
+	var graph recall.Graph
+	call(t, s, "recall_graph", map[string]any{}, &graph)
+	if len(graph.Nodes) != 2 || len(graph.Edges) != 1 {
+		t.Fatalf("graph = %+v", graph)
+	}
+	edge := graph.Edges[0]
+	if edge.Source != source.ID || edge.Target != target.ID || edge.Type != string(memory.RelationshipUsesTool) || edge.Note != "agent graph" {
+		t.Fatalf("edge = %+v", edge)
+	}
+}
+
+func TestMCPGraphSupportsDomainFilter(t *testing.T) {
+	e, s := startTestServerWithEngine(t)
+	ctx := context.Background()
+
+	target, _, err := e.Add(ctx, recall.AddParams{Title: "Target", Body: "shared target", Domain: "tools"})
+	if err != nil {
+		t.Fatalf("Add target: %v", err)
+	}
+	if _, _, err := e.Add(ctx, recall.AddParams{
+		Title:  "Project edge",
+		Body:   "project source",
+		Domain: "projects",
+		Relationships: []memory.Relationship{{
+			TargetID: target.ID,
+			Type:     memory.RelationshipUsesTool,
+		}},
+	}); err != nil {
+		t.Fatalf("Add project source: %v", err)
+	}
+	if _, _, err := e.Add(ctx, recall.AddParams{
+		Title:  "Decision edge",
+		Body:   "decision source",
+		Domain: "decisions",
+		Relationships: []memory.Relationship{{
+			TargetID: target.ID,
+			Type:     memory.RelationshipRelatedTo,
+		}},
+	}); err != nil {
+		t.Fatalf("Add decision source: %v", err)
+	}
+
+	var graph recall.Graph
+	call(t, s, "recall_graph", map[string]any{"domain": "projects"}, &graph)
+	if len(graph.Edges) != 1 || graph.Edges[0].Type != string(memory.RelationshipUsesTool) {
+		t.Fatalf("filtered graph = %+v", graph)
+	}
+	if len(graph.Nodes) != 2 {
+		t.Fatalf("filtered nodes = %+v, want source plus target", graph.Nodes)
 	}
 }
 

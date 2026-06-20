@@ -75,6 +75,7 @@ Expected MCP tools:
 - `recall_get` — full Markdown content by id.
 - `recall_add` — create durable memory.
 - `recall_update` — edit fields/relationships.
+- `recall_graph` — return typed relationships as nodes and edges; use `domain` to filter source memories.
 - `recall_list_domains` — list domain folders and descriptions.
 - `recall_reindex` — rebuild SQLite index after manual vault edits.
 - Optional: `recall_doctor`, `recall_list`, `recall_use_project` if exposed by current server.
