@@ -12,6 +12,9 @@ interface Props {
 
 const domainColors = ['bg-sky-400', 'bg-emerald-400', 'bg-amber-300', 'bg-rose-400', 'bg-violet-400', 'bg-slate-400']
 
+const activeCls = 'border-sky-400/25 bg-gradient-to-r from-sky-400/15 to-violet-500/15 text-white shadow-[0_14px_34px_rgba(56,189,248,0.10)]'
+const idleCls = 'border-transparent text-slate-400 hover:bg-white/[0.05] hover:text-white'
+
 export function DomainSidebar({
   domains, selected, onSelect, onReindex, reindexing,
 }: Props) {
@@ -32,10 +35,8 @@ export function DomainSidebar({
         <button
           onClick={() => onSelect(null)}
           className={cn(
-            'mb-2 flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left text-sm transition-all',
-            !selected
-              ? 'border border-sky-400/25 bg-gradient-to-r from-sky-400/15 to-violet-500/15 text-white shadow-[0_14px_34px_rgba(56,189,248,0.10)]'
-              : 'text-slate-400 hover:bg-white/[0.05] hover:text-white',
+            'mb-2 flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition-colors duration-150',
+            !selected ? activeCls : idleCls,
           )}
         >
           <span className="flex items-center gap-3 font-semibold"><span className="h-2.5 w-2.5 rounded-full bg-sky-400 shadow-[0_0_18px_currentColor]" />All memories</span>
@@ -47,10 +48,8 @@ export function DomainSidebar({
             onClick={() => onSelect(d.name)}
             title={d.description}
             className={cn(
-              'mb-2 flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left text-sm transition-all',
-              selected === d.name
-                ? 'border border-sky-400/25 bg-gradient-to-r from-sky-400/15 to-violet-500/15 text-white shadow-[0_14px_34px_rgba(56,189,248,0.10)]'
-                : 'text-slate-400 hover:bg-white/[0.05] hover:text-white',
+              'mb-2 flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition-colors duration-150',
+              selected === d.name ? activeCls : idleCls,
             )}
           >
             <span className="flex min-w-0 items-center gap-3 font-semibold">
