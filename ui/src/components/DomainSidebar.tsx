@@ -36,12 +36,12 @@ export function DomainSidebar({
         <button
           onClick={() => onSelect(null)}
           className={cn(
-            'mb-2 flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition-colors duration-150',
+            'mb-1.5 flex w-full items-center justify-between rounded-xl border px-2.5 py-2 text-left text-[13px] transition-colors duration-150',
             !selected ? activeCls : idleCls,
           )}
         >
-          <span className="flex items-center gap-3 font-semibold"><span className="h-2.5 w-2.5 rounded-full bg-sky-400 shadow-[0_0_18px_currentColor]" />All memories</span>
-          <span className="text-xs text-slate-500">all</span>
+          <span className="flex items-center gap-2.5 font-semibold"><span className="h-2 w-2 rounded-full bg-sky-400 shadow-[0_0_14px_currentColor]" />All memories</span>
+          <span className="text-[11px] text-slate-500">all</span>
         </button>
         {domains.map((d, index) => (
           <button
@@ -49,12 +49,12 @@ export function DomainSidebar({
             onClick={() => onSelect(d.name)}
             title={d.description}
             className={cn(
-              'mb-2 flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition-colors duration-150',
+              'mb-1.5 flex w-full items-center justify-between gap-2.5 rounded-xl border px-2.5 py-2 text-left text-[13px] transition-colors duration-150',
               selected === d.name ? activeCls : idleCls,
             )}
           >
-            <span className="flex min-w-0 items-center gap-3 font-semibold">
-              <span className={cn('h-2.5 w-2.5 flex-shrink-0 rounded-full shadow-[0_0_18px_currentColor]', domainColors[index % domainColors.length])} />
+            <span className="flex min-w-0 items-center gap-2.5 font-semibold">
+              <span className={cn('h-2 w-2 flex-shrink-0 rounded-full shadow-[0_0_14px_currentColor]', domainColors[index % domainColors.length])} />
               <span className="truncate">{d.name}</span>
             </span>
           </button>
