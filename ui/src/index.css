@@ -6,38 +6,13 @@
 
 :root {
   color-scheme: dark;
-  --recall-bg: #06070d;
-  --recall-panel: rgba(16, 18, 31, 0.78);
-  --recall-line: rgba(255, 255, 255, 0.09);
-  --recall-cyan: #38bdf8;
-  --recall-violet: #8b5cf6;
-  --recall-emerald: #34d399;
-  --recall-amber: #fbbf24;
-  --recall-rose: #fb7185;
 }
 
 body {
   margin: 0;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(56, 189, 248, 0.24), transparent 28%),
-    radial-gradient(circle at 88% 18%, rgba(139, 92, 246, 0.28), transparent 30%),
-    radial-gradient(circle at 50% 92%, rgba(52, 211, 153, 0.14), transparent 36%),
-    linear-gradient(135deg, #050713 0%, #0b1022 45%, #100718 100%);
+  background: #06070d;
   color: #f8fafc;
-}
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.16;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 34px 34px;
-  mask-image: radial-gradient(circle at center, black 0%, transparent 86%);
 }
 
 #root {
