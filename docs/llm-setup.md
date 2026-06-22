@@ -99,6 +99,7 @@ Expected tools:
 
 ```text
 recall_add
+recall_doctor
 recall_get
 recall_graph
 recall_list_domains

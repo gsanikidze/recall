@@ -22,7 +22,7 @@ AI agents lose context between sessions, tools, and products. Recall gives them 
 - **Markdown source of truth** — humans can inspect and manually fix memories when needed.
 - **SQLite index** — agents can search/filter quickly without parsing the whole vault every time.
 - **MCP interface** — Hermes, Claude, Codex, or other MCP clients can use the same memory tools.
-- **CLI + TUI + read-only web UI** — scriptable for agents, inspectable for humans.
+- **CLI / MCP / API / read-only web UI** — scriptable for agents, inspectable for humans.
 - **Agent setup docs/skills/scripts** — practical bootstrap path, not only a library.
 
 ## What Recall is not
@@ -247,7 +247,7 @@ Check workspace health:
 recall doctor
 ```
 
-Open TUI:
+Print help:
 
 ```bash
 recall
@@ -383,6 +383,10 @@ Near-term polish before wider launch:
 - relationship graph browsing;
 - safer review workflow for agent-written memories;
 - optional sync/export story without making cloud required.
+
+## License
+
+Recall is free for personal, non-commercial use only. Commercial use requires prior written permission from the copyright holder. See [LICENSE](LICENSE).
 
 ## More docs
 

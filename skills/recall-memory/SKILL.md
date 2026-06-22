@@ -3,7 +3,7 @@ name: recall-memory
 description: Use Recall MCP as local-first long-lived memory for projects, decisions, people, tools, research, and opportunities.
 version: 1.0.0
 author: Recall
-license: MIT
+license: Personal-Use-Only
 platforms: [linux, macos, windows]
 ---
 
@@ -47,8 +47,10 @@ Skip credentials, tokens, one-off command output, commit SHAs, PR numbers, issue
 - `recall_graph`
 - `recall_list_domains`
 - `recall_reindex`
+- `recall_doctor`
+- `recall_use_project`
 
-Optional current/future tools may include `recall_doctor`, `recall_list`, and `recall_use_project`.
+Optional current/future tools may include `recall_list`.
 
 ## Fallback
 

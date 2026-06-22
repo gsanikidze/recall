@@ -30,6 +30,7 @@ export interface DoctorEmbeddings {
   embedded: number
   missing: number
   coverage: number
+  missing_embedding_ids?: string[]
 }
 
 export interface DoctorSuggestion {

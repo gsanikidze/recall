@@ -1,5 +1,5 @@
 // Package mcpserver exposes the recall engine to LLM agents over the Model
-// Context Protocol on a local stdio transport. It registers six tools that map
+// Context Protocol on a local stdio transport. It registers tools that map
 // directly onto the engine. Tool descriptions steer agents to store only
 // durable, decision-relevant facts and to route writes by reading domain
 // descriptions first.
@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 
+	"recall/internal/doctor"
 	"recall/internal/embedding"
 	"recall/internal/index"
 	"recall/internal/memory"
@@ -22,9 +23,10 @@ import (
 )
 
 // Serve runs the MCP server on stdio until the connection closes.
-func Serve(ctx context.Context, e *recall.Engine, version string, switchers ...ProjectSwitcher) error {
+// configPath is the recall config file path (may be empty if undiscoverable).
+func Serve(ctx context.Context, e *recall.Engine, version, configPath string, switchers ...ProjectSwitcher) error {
 	server := mcp.NewServer(&mcp.Implementation{Name: "recall", Version: version}, nil)
-	register(server, e, switchers...)
+	register(server, e, configPath, switchers...)
 	return server.Run(ctx, &mcp.StdioTransport{})
 }
 
@@ -38,7 +40,7 @@ type ProjectOut struct {
 }
 
 // register wires every tool onto the server.
-func register(server *mcp.Server, e *recall.Engine, switchers ...ProjectSwitcher) {
+func register(server *mcp.Server, e *recall.Engine, configPath string, switchers ...ProjectSwitcher) {
 	var switcher ProjectSwitcher
 	if len(switchers) > 0 {
 		switcher = switchers[0]
@@ -93,6 +95,16 @@ func register(server *mcp.Server, e *recall.Engine, switchers ...ProjectSwitcher
 		Description: "Change the saved Recall project directory. Existing files are preserved; missing " +
 			"vault/ and db/ scaffold directories are created. New MCP sessions use the new directory.",
 	}, useProjectHandler(switcher))
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "recall_doctor",
+		Description: "Check config, vault, SQLite index, domains, and embedding coverage. " +
+			"Returns a health report with ok status, paths, counts, invalid files, stale index rows, " +
+			"embedding backend probe, missing embedding IDs (first 20), and copy-pasteable fix suggestions. " +
+			"Use deep=true for vault/index drift audit and invalid file detection. " +
+			"Use embeddings=true to probe embedding backend and report coverage. " +
+			"provider/model default to ollama/nomic-embed-text.",
+	}, doctorHandler(e, configPath))
 }
 
 // ---- recall_use_project ----
@@ -114,6 +126,33 @@ func useProjectHandler(switcher ProjectSwitcher) func(context.Context, *mcp.Call
 			return nil, ProjectOut{}, err
 		}
 		return jsonResult(out), out, nil
+	}
+}
+
+// ---- recall_doctor ----
+
+type doctorArgs struct {
+	Deep       bool   `json:"deep,omitempty" jsonschema:"audit vault/index drift and invalid memory files"`
+	Embeddings bool   `json:"embeddings,omitempty" jsonschema:"probe embedding backend and report coverage"`
+	Provider   string `json:"provider,omitempty" jsonschema:"embedding provider for embeddings audit; default ollama"`
+	Model      string `json:"model,omitempty" jsonschema:"embedding model for embeddings audit; default nomic-embed-text"`
+}
+
+func doctorHandler(e *recall.Engine, configPath string) func(context.Context, *mcp.CallToolRequest, doctorArgs) (*mcp.CallToolResult, doctor.Report, error) {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, a doctorArgs) (*mcp.CallToolResult, doctor.Report, error) {
+		projectPath := ""
+		if e != nil {
+			projectPath = e.ProjectPath()
+		}
+		vaultPath := doctor.JoinVaultPath(projectPath)
+		dbPath := doctor.JoinDBPath(projectPath)
+		report := doctor.Run(ctx, e, doctor.Options{
+			Deep:       a.Deep,
+			Embeddings: a.Embeddings,
+			Provider:   a.Provider,
+			Model:      a.Model,
+		}, projectPath, vaultPath, dbPath, configPath)
+		return jsonResult(report), report, nil
 	}
 }
 

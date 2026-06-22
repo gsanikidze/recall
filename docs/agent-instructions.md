@@ -78,7 +78,8 @@ Expected MCP tools:
 - `recall_graph` — return typed relationships as nodes and edges; use `domain` to filter source memories.
 - `recall_list_domains` — list domain folders and descriptions.
 - `recall_reindex` — rebuild SQLite index after manual vault edits.
-- Optional: `recall_doctor`, `recall_list`, `recall_use_project` if exposed by current server.
+- `recall_doctor` — check config, vault, SQLite index, domains, and embedding coverage. Use `deep=true` for vault/index drift and `embeddings=true` for embedding backend probe + coverage.
+- Optional: `recall_list`, `recall_use_project` if exposed by current server.
 
 ## Reporting pattern
 

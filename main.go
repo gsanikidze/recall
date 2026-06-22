@@ -90,6 +90,6 @@ Vector search quick start:
   recall embed --provider ollama --model nomic-embed-text
   recall search "phone sync" --hybrid --provider ollama --model nomic-embed-text
 
-Run with no command to open the interactive TUI.
+Run with no command to print this help.
 `)
 }

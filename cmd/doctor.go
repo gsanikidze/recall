@@ -83,6 +83,12 @@ func printDoctor(r doctor.Report) error {
 		}
 		fmt.Printf(" reachable=%v model_available=%v embedded=%d missing=%d coverage=%.2f\n",
 			r.Embeddings.Reachable, r.Embeddings.ModelAvailable, r.Embeddings.Embedded, r.Embeddings.Missing, r.Embeddings.Coverage)
+		if len(r.Embeddings.MissingEmbeddingIDs) > 0 {
+			fmt.Printf("missing embedding ids (first %d of %d):\n", len(r.Embeddings.MissingEmbeddingIDs), r.Embeddings.Missing)
+			for _, id := range r.Embeddings.MissingEmbeddingIDs {
+				fmt.Printf("  %s\n", id)
+			}
+		}
 		if r.Embeddings.ServerError != "" {
 			fmt.Printf("embedding server: %s\n", r.Embeddings.ServerError)
 		}

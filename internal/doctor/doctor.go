@@ -25,15 +25,15 @@ type Options struct {
 
 // Report is the audit result. JSON tags are stable: CLI tests assert on them.
 type Report struct {
-	OK                bool         `json:"ok"`
-	ProjectPath       string       `json:"project_path"`
-	ConfigPath        string       `json:"config_path"`
-	VaultPath         string       `json:"vault_path"`
-	DBPath            string       `json:"db_path"`
-	Domains           int          `json:"domains"`
-	Memories          int          `json:"memories"`
-	VaultMemories     int          `json:"vault_memories,omitempty"`
-	IndexMemories     int          `json:"index_memories,omitempty"`
+	OK                bool            `json:"ok"`
+	ProjectPath       string          `json:"project_path"`
+	ConfigPath        string          `json:"config_path"`
+	VaultPath         string          `json:"vault_path"`
+	DBPath            string          `json:"db_path"`
+	Domains           int             `json:"domains"`
+	Memories          int             `json:"memories"`
+	VaultMemories     int             `json:"vault_memories,omitempty"`
+	IndexMemories     int             `json:"index_memories,omitempty"`
 	InvalidFiles      []InvalidFile   `json:"invalid_files,omitempty"`
 	StaleIndexIDs     []string        `json:"stale_index_ids,omitempty"`
 	MissingIndexPaths []MissingIndex  `json:"missing_index_paths,omitempty"`
@@ -67,16 +67,17 @@ type Suggestion struct {
 // EmbeddingReady summarises embedding coverage for indexed memories plus a
 // live probe of the embedding backend (server reachable, model pulled).
 type EmbeddingReady struct {
-	Provider         string   `json:"provider"`
-	Model            string   `json:"model"`
-	ServerURL        string   `json:"server_url,omitempty"`
-	Reachable        bool     `json:"reachable"`
-	ModelAvailable   bool     `json:"model_available"`
-	ServerError      string   `json:"server_error,omitempty"`
-	AvailableModels  []string `json:"available_models,omitempty"`
-	Embedded         int      `json:"embedded"`
-	Missing          int      `json:"missing"`
-	Coverage         float64  `json:"coverage"`
+	Provider            string   `json:"provider"`
+	Model               string   `json:"model"`
+	ServerURL           string   `json:"server_url,omitempty"`
+	Reachable           bool     `json:"reachable"`
+	ModelAvailable      bool     `json:"model_available"`
+	ServerError         string   `json:"server_error,omitempty"`
+	AvailableModels     []string `json:"available_models,omitempty"`
+	Embedded            int      `json:"embedded"`
+	Missing             int      `json:"missing"`
+	Coverage            float64  `json:"coverage"`
+	MissingEmbeddingIDs []string `json:"missing_embedding_ids,omitempty"`
 }
 
 // Run performs the configured audits against the engine and returns a Report.
@@ -238,11 +239,16 @@ func auditEmbeddings(ctx context.Context, e *recall.Engine, report *Report, prov
 		embeddedIDs[emb.MemoryID] = struct{}{}
 	}
 	missing := 0
+	var missingIDs []string
 	for _, id := range ids {
 		if _, ok := embeddedIDs[id]; !ok {
 			missing++
+			if len(missingIDs) < 20 {
+				missingIDs = append(missingIDs, id)
+			}
 		}
 	}
+	sort.Strings(missingIDs)
 	coverage := 1.0
 	if len(ids) > 0 {
 		coverage = float64(len(ids)-missing) / float64(len(ids))
@@ -253,6 +259,7 @@ func auditEmbeddings(ctx context.Context, e *recall.Engine, report *Report, prov
 	ready.Embedded = len(ids) - missing
 	ready.Missing = missing
 	ready.Coverage = coverage
+	ready.MissingEmbeddingIDs = missingIDs
 	report.Embeddings = ready
 }
 

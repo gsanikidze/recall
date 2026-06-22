@@ -113,6 +113,21 @@ function EmbeddingsBlock({ emb }: { emb: DoctorEmbeddings }) {
             pulled: {emb.available_models.join(', ')}
           </div>
         )}
+
+      {/* List missing embedding IDs when coverage gaps exist */}
+      {backendOk && emb.missing_embedding_ids && emb.missing_embedding_ids.length > 0 && (
+        <div className="flex flex-col gap-0.5 rounded-md bg-amber-500/5 px-2 py-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-300/70">
+            Missing embeddings ({emb.missing_embedding_ids.length}
+            {emb.missing > emb.missing_embedding_ids.length && ` of ${emb.missing}`})
+          </span>
+          {emb.missing_embedding_ids.map(id => (
+            <span key={id} className="truncate font-mono text-[9px] text-slate-500" title={id}>
+              {id}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

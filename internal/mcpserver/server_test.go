@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"recall/internal/doctor"
 	"recall/internal/embedding"
 	"recall/internal/index"
 	"recall/internal/memory"
@@ -41,7 +42,7 @@ func startTestServerWithEngineAndSwitcher(t *testing.T, switcher ProjectSwitcher
 	t.Cleanup(func() { _ = e.Close() })
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "recall", Version: "test"}, nil)
-	register(server, e, switcher)
+	register(server, e, "", switcher)
 
 	serverT, clientT := mcp.NewInMemoryTransports()
 	if _, err := server.Connect(ctx, serverT, nil); err != nil {
@@ -111,7 +112,7 @@ func TestMCPToolsListed(t *testing.T) {
 	want := map[string]bool{
 		"recall_search": false, "recall_get": false, "recall_add": false,
 		"recall_update": false, "recall_list_domains": false, "recall_reindex": false,
-		"recall_use_project": false, "recall_graph": false,
+		"recall_use_project": false, "recall_graph": false, "recall_doctor": false,
 	}
 	for _, tool := range res.Tools {
 		if _, ok := want[tool.Name]; ok {
@@ -344,6 +345,64 @@ func TestMCPSearchRejectsInvalidFilters(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			callExpectError(t, s, "recall_search", tc.args, tc.want)
 		})
+	}
+}
+
+func TestMCPDoctorReturnsReport(t *testing.T) {
+	e, s := startTestServerWithEngine(t)
+	ctx := context.Background()
+
+	// Add a memory so the report has something to count.
+	if _, _, err := e.Add(ctx, recall.AddParams{Title: "Doc test", Body: "doctor probe", Domain: "tools"}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	var report doctor.Report
+	call(t, s, "recall_doctor", map[string]any{}, &report)
+	if !report.OK {
+		t.Fatalf("doctor report not ok: %+v", report)
+	}
+	if report.Memories != 1 {
+		t.Fatalf("memories = %d, want 1", report.Memories)
+	}
+	if report.ProjectPath == "" {
+		t.Fatal("project_path is empty")
+	}
+}
+
+func TestMCPDoctorDeepAndEmbeddings(t *testing.T) {
+	e, s := startTestServerWithEngine(t)
+	ctx := context.Background()
+
+	if _, _, err := e.Add(ctx, recall.AddParams{Title: "Deep", Body: "deep audit", Domain: "tools"}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	var report doctor.Report
+	call(t, s, "recall_doctor", map[string]any{
+		"deep":       true,
+		"embeddings": true,
+		"provider":   "fake",
+		"model":      "fake-32",
+	}, &report)
+
+	// Deep audit should populate vault/index counts.
+	if report.VaultMemories == 0 || report.IndexMemories == 0 {
+		t.Fatalf("deep counts empty: vault=%d index=%d", report.VaultMemories, report.IndexMemories)
+	}
+	// Embeddings audit with fake provider should be reachable.
+	if report.Embeddings == nil {
+		t.Fatal("embeddings is nil")
+	}
+	if !report.Embeddings.Reachable || !report.Embeddings.ModelAvailable {
+		t.Fatalf("fake embeddings not healthy: %+v", report.Embeddings)
+	}
+	// One memory, no embeddings yet → 1 missing.
+	if report.Embeddings.Missing != 1 {
+		t.Fatalf("missing = %d, want 1", report.Embeddings.Missing)
+	}
+	if len(report.Embeddings.MissingEmbeddingIDs) != 1 {
+		t.Fatalf("missing_embedding_ids = %v, want 1 entry", report.Embeddings.MissingEmbeddingIDs)
 	}
 }
 
