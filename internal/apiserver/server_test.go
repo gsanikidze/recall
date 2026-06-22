@@ -376,9 +376,9 @@ func TestDoctorEndpointReportsCountsAndDeep(t *testing.T) {
 		t.Fatalf("status = %d body=%s", resp.StatusCode, body)
 	}
 	var got struct {
-		OK       bool   `json:"ok"`
-		Domains  int    `json:"domains"`
-		Memories int    `json:"memories"`
+		OK       bool `json:"ok"`
+		Domains  int  `json:"domains"`
+		Memories int  `json:"memories"`
 	}
 	decodeJSON(t, resp, &got)
 	if !got.OK || got.Memories != 2 || got.Domains == 0 {
@@ -392,9 +392,9 @@ func TestDoctorEndpointReportsCountsAndDeep(t *testing.T) {
 		t.Fatalf("deep status = %d body=%s", deep.StatusCode, body)
 	}
 	var deepGot struct {
-		OK             bool `json:"ok"`
-		VaultMemories  int  `json:"vault_memories"`
-		IndexMemories  int  `json:"index_memories"`
+		OK            bool `json:"ok"`
+		VaultMemories int  `json:"vault_memories"`
+		IndexMemories int  `json:"index_memories"`
 	}
 	decodeJSON(t, deep, &deepGot)
 	if !deepGot.OK || deepGot.VaultMemories != 2 || deepGot.IndexMemories != 2 {
