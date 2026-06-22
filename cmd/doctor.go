@@ -93,5 +93,8 @@ func printDoctor(r doctor.Report) error {
 	for _, err := range r.Errors {
 		fmt.Printf("error:   %s\n", err)
 	}
+	for _, s := range r.Suggestions {
+		fmt.Printf("\n--- suggestion: %s [%s] ---\n%s\n", s.Title, s.Severity, s.Prompt)
+	}
 	return nil
 }

@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Activity, AlertTriangle, CheckCircle2, RefreshCw, Stethoscope } from 'lucide-react'
+import { Activity, AlertTriangle, CheckCircle2, ChevronDown, ClipboardCopy, RefreshCw, Stethoscope } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDoctor } from '@/queries'
-import type { DoctorEmbeddings, DoctorReport } from '@/api/types'
+import type { DoctorEmbeddings, DoctorReport, DoctorSuggestion } from '@/api/types'
 
 function pct(n: number) {
   return `${Math.round(n * 100)}%`
@@ -117,6 +117,79 @@ function EmbeddingsBlock({ emb }: { emb: DoctorEmbeddings }) {
   )
 }
 
+function SuggestionCard({ s }: { s: DoctorSuggestion }) {
+  const [expanded, setExpanded] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const isError = s.severity === 'error'
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(s.prompt)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard API may be blocked; ignore silently
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        'overflow-hidden rounded-lg border',
+        isError
+          ? 'border-rose-400/20 bg-rose-500/[0.04]'
+          : 'border-amber-400/20 bg-amber-500/[0.04]',
+      )}
+    >
+      <div className="flex items-center gap-1.5 px-2 py-1.5">
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+        >
+          <span
+            className={cn(
+              'h-1.5 w-1.5 flex-shrink-0 rounded-full',
+              isError ? 'bg-rose-400' : 'bg-amber-400',
+            )}
+          />
+          <span className="truncate text-[11px] font-semibold text-slate-200">
+            {s.title}
+          </span>
+          <ChevronDown
+            className={cn(
+              'h-3 w-3 flex-shrink-0 text-slate-500 transition-transform',
+              expanded && 'rotate-180',
+            )}
+          />
+        </button>
+        <button
+          onClick={copy}
+          title={copied ? 'Copied!' : 'Copy prompt'}
+          className={cn(
+            'flex-shrink-0 rounded p-1 transition-colors',
+            copied
+              ? 'text-emerald-300'
+              : 'text-slate-500 hover:bg-white/5 hover:text-white',
+          )}
+        >
+          {copied ? (
+            <CheckCircle2 className="h-3 w-3" />
+          ) : (
+            <ClipboardCopy className="h-3 w-3" />
+          )}
+        </button>
+      </div>
+      {expanded && (
+        <div className="border-t border-white/5 px-2 py-1.5">
+          <p className="whitespace-pre-wrap text-[10px] leading-relaxed text-slate-400">
+            {s.prompt}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Body({ report, loading, deep, onToggleDeep, onRefresh }: {
   report: DoctorReport | undefined
   loading: boolean
@@ -205,6 +278,17 @@ function Body({ report, loading, deep, onToggleDeep, onRefresh }: {
             <li className="text-[11px] text-slate-500">+{report.errors.length - 3} more</li>
           )}
         </ul>
+      )}
+
+      {report.suggestions && report.suggestions.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Fix prompts
+          </span>
+          {report.suggestions.map(s => (
+            <SuggestionCard key={s.id} s={s} />
+          ))}
+        </div>
       )}
 
       <button

@@ -32,6 +32,13 @@ export interface DoctorEmbeddings {
   coverage: number
 }
 
+export interface DoctorSuggestion {
+  id: string
+  title: string
+  severity: string
+  prompt: string
+}
+
 export interface DoctorReport {
   ok: boolean
   project_path: string
@@ -46,6 +53,7 @@ export interface DoctorReport {
   stale_index_ids?: string[]
   missing_index_paths?: DoctorMissingIndex[]
   embeddings?: DoctorEmbeddings
+  suggestions?: DoctorSuggestion[]
   errors: string[]
 }
 

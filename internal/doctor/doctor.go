@@ -25,19 +25,20 @@ type Options struct {
 
 // Report is the audit result. JSON tags are stable: CLI tests assert on them.
 type Report struct {
-	OK                bool             `json:"ok"`
-	ProjectPath       string          `json:"project_path"`
-	ConfigPath        string          `json:"config_path"`
-	VaultPath         string          `json:"vault_path"`
-	DBPath            string          `json:"db_path"`
-	Domains           int             `json:"domains"`
-	Memories          int             `json:"memories"`
-	VaultMemories     int             `json:"vault_memories,omitempty"`
-	IndexMemories     int             `json:"index_memories,omitempty"`
+	OK                bool         `json:"ok"`
+	ProjectPath       string       `json:"project_path"`
+	ConfigPath        string       `json:"config_path"`
+	VaultPath         string       `json:"vault_path"`
+	DBPath            string       `json:"db_path"`
+	Domains           int          `json:"domains"`
+	Memories          int          `json:"memories"`
+	VaultMemories     int          `json:"vault_memories,omitempty"`
+	IndexMemories     int          `json:"index_memories,omitempty"`
 	InvalidFiles      []InvalidFile   `json:"invalid_files,omitempty"`
 	StaleIndexIDs     []string        `json:"stale_index_ids,omitempty"`
 	MissingIndexPaths []MissingIndex  `json:"missing_index_paths,omitempty"`
 	Embeddings        *EmbeddingReady `json:"embeddings,omitempty"`
+	Suggestions       []Suggestion    `json:"suggestions,omitempty"`
 	Errors            []string        `json:"errors"`
 }
 
@@ -51,6 +52,16 @@ type InvalidFile struct {
 type MissingIndex struct {
 	ID   string `json:"id"`
 	Path string `json:"path"`
+}
+
+// Suggestion is a copy-pasteable prompt the user can hand to an AI agent to
+// fix a specific doctor issue. Severity is "error" (blocks core function) or
+// "warning" (degraded but usable).
+type Suggestion struct {
+	ID       string `json:"id"`
+	Title    string `json:"title"`
+	Severity string `json:"severity"`
+	Prompt   string `json:"prompt"`
 }
 
 // EmbeddingReady summarises embedding coverage for indexed memories plus a
@@ -118,6 +129,7 @@ func Run(ctx context.Context, e *recall.Engine, opts Options, projectPath, vault
 	if opts.Embeddings {
 		auditEmbeddings(ctx, e, &report, opts.Provider, opts.Model)
 	}
+	report.Suggestions = buildSuggestions(&report)
 	return report
 }
 
@@ -242,6 +254,160 @@ func auditEmbeddings(ctx context.Context, e *recall.Engine, report *Report, prov
 	ready.Missing = missing
 	ready.Coverage = coverage
 	report.Embeddings = ready
+}
+
+// buildSuggestions inspects the report and returns copy-pasteable agent prompts
+// for each issue found. Order: fatal path/db issues first, then vault/index
+// drift, then embedding backend, then coverage gaps, then generic errors.
+func buildSuggestions(r *Report) []Suggestion {
+	var out []Suggestion
+
+	// --- Project path ---
+	if r.ProjectPath != "" {
+		if info, err := os.Stat(r.ProjectPath); err != nil || !info.IsDir() {
+			out = append(out, Suggestion{
+				ID:       "project-missing",
+				Title:    "Project directory missing",
+				Severity: "error",
+				Prompt: fmt.Sprintf(
+					"The Recall project directory is missing or not a directory at %q. "+
+						"Re-initialize it with `recall init --path %s --force`, or update the config at %q to point to the correct project path.",
+					r.ProjectPath, r.ProjectPath, r.ConfigPath,
+				),
+			})
+		}
+	}
+
+	// --- Vault path ---
+	if r.VaultPath != "" {
+		if info, err := os.Stat(r.VaultPath); err != nil || !info.IsDir() {
+			out = append(out, Suggestion{
+				ID:       "vault-missing",
+				Title:    "Vault directory missing",
+				Severity: "error",
+				Prompt: fmt.Sprintf(
+					"The Recall vault directory is missing at %q. "+
+						"Recreate it (`mkdir -p %s`) and run `recall reindex` to rebuild the SQLite index from the vault, "+
+						"or re-initialize the project with `recall init --path %s --force`.",
+					r.VaultPath, r.VaultPath, r.ProjectPath,
+				),
+			})
+		}
+	}
+
+	// --- DB path ---
+	if r.DBPath != "" {
+		if _, err := os.Stat(r.DBPath); err != nil {
+			out = append(out, Suggestion{
+				ID:       "db-missing",
+				Title:    "SQLite database missing",
+				Severity: "error",
+				Prompt: fmt.Sprintf(
+					"The Recall SQLite database is missing at %q. "+
+						"Run `recall reindex` to rebuild it from the vault markdown files.",
+					r.DBPath,
+				),
+			})
+		}
+	}
+
+	// --- Invalid vault files ---
+	if len(r.InvalidFiles) > 0 {
+		var lines []string
+		for _, f := range r.InvalidFiles {
+			lines = append(lines, fmt.Sprintf("  - %s: %s", f.Path, f.Error))
+		}
+		out = append(out, Suggestion{
+			ID:       "invalid-files",
+			Title:    fmt.Sprintf("%d invalid vault file(s)", len(r.InvalidFiles)),
+			Severity: "warning",
+			Prompt: fmt.Sprintf(
+				"The following Recall vault files failed to parse:\n%s\n"+
+					"Inspect each file, fix the markdown/YAML frontmatter (common issues: missing or malformed `id`, `title`, `domain` fields), "+
+					"then run `recall reindex` to rebuild the index.",
+				strings.Join(lines, "\n"),
+			),
+		})
+	}
+
+	// --- Stale index / missing vault files ---
+	if len(r.MissingIndexPaths) > 0 {
+		out = append(out, Suggestion{
+			ID:       "stale-index",
+			Title:    fmt.Sprintf("%d stale index row(s)", len(r.MissingIndexPaths)),
+			Severity: "warning",
+			Prompt: fmt.Sprintf(
+				"The Recall SQLite index has %d entries pointing to vault files that no longer exist. "+
+					"Run `recall reindex` to rebuild the index from the current vault. "+
+					"If those memories were deleted intentionally, reindexing will clean up the stale rows.",
+				len(r.MissingIndexPaths),
+			),
+		})
+	}
+
+	// --- Embedding backend ---
+	if r.Embeddings != nil {
+		emb := r.Embeddings
+		if !emb.Reachable {
+			url := emb.ServerURL
+			if url == "" {
+				url = "http://127.0.0.1:11434"
+			}
+			out = append(out, Suggestion{
+				ID:       "ollama-unreachable",
+				Title:    "Ollama server unreachable",
+				Severity: "error",
+				Prompt: fmt.Sprintf(
+					"The Ollama embedding server is not reachable at %s. "+
+						"Start it with `ollama serve` in a separate terminal, "+
+						"or install Ollama from https://ollama.com if it is not installed. "+
+						"Then verify with `recall doctor --embeddings`.",
+					url,
+				),
+			})
+		} else if !emb.ModelAvailable {
+			out = append(out, Suggestion{
+				ID:       "model-not-pulled",
+				Title:    fmt.Sprintf("Model %q not pulled", emb.Model),
+				Severity: "error",
+				Prompt: fmt.Sprintf(
+					"The embedding model %q is not pulled in Ollama. "+
+						"Run `ollama pull %s` to download it, then verify with `recall doctor --embeddings`.",
+					emb.Model, emb.Model,
+				),
+			})
+		}
+
+		// --- Coverage gaps (only when backend is healthy) ---
+		if emb.Reachable && emb.ModelAvailable && emb.Missing > 0 {
+			out = append(out, Suggestion{
+				ID:       "embeddings-missing",
+				Title:    fmt.Sprintf("%d memories missing embeddings", emb.Missing),
+				Severity: "warning",
+				Prompt: fmt.Sprintf(
+					"%d indexed memories are missing embedding vectors (coverage: %.0f%%). "+
+						"Run `recall embed --provider %s --model %s` to generate embeddings for all indexed memories.",
+					emb.Missing, emb.Coverage*100, emb.Provider, emb.Model,
+				),
+			})
+		}
+	}
+
+	// --- Generic errors not covered above ---
+	for _, e := range r.Errors {
+		// Skip errors we already surfaced as specific suggestions
+		if strings.Contains(e, "project path") || strings.Contains(e, "vault missing") || strings.Contains(e, "db missing") || strings.Contains(e, "engine not open") {
+			continue
+		}
+		out = append(out, Suggestion{
+			ID:       "error-" + fmt.Sprintf("%d", len(out)),
+			Title:    "Error",
+			Severity: "error",
+			Prompt:   fmt.Sprintf("Recall doctor reported an error: %s. Investigate the cause and fix it, then re-run `recall doctor`.", e),
+		})
+	}
+
+	return out
 }
 
 // JoinDBPath returns the conventional db path for a project root.
