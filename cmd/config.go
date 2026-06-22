@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Config holds persistent recall settings
@@ -82,4 +83,23 @@ func defaultProjectPath() (string, error) {
 		return "", fmt.Errorf("locating home dir: %w", err)
 	}
 	return filepath.Join(home, "recall"), nil
+}
+
+// currentProjectPath resolves the active recall project root, honouring
+// RECALL_PROJECT / RECALL_HOME env overrides before falling back to config.
+func currentProjectPath() (string, error) {
+	if override := strings.TrimSpace(os.Getenv("RECALL_PROJECT")); override != "" {
+		return resolvePath(override)
+	}
+	if override := strings.TrimSpace(os.Getenv("RECALL_HOME")); override != "" {
+		return resolvePath(override)
+	}
+	cfg, found, err := loadConfig()
+	if err != nil {
+		return "", err
+	}
+	if !found || cfg.ProjectPath == "" {
+		return "", fmt.Errorf("recall is not initialized; run \"recall init\" first")
+	}
+	return cfg.ProjectPath, nil
 }

@@ -4,49 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
+	"recall/internal/doctor"
 	"recall/internal/embedding"
-	"recall/internal/recall"
 )
-
-type doctorReport struct {
-	OK                bool                      `json:"ok"`
-	ProjectPath       string                    `json:"project_path"`
-	ConfigPath        string                    `json:"config_path"`
-	VaultPath         string                    `json:"vault_path"`
-	DBPath            string                    `json:"db_path"`
-	Domains           int                       `json:"domains"`
-	Memories          int                       `json:"memories"`
-	VaultMemories     int                       `json:"vault_memories,omitempty"`
-	IndexMemories     int                       `json:"index_memories,omitempty"`
-	InvalidFiles      []doctorInvalidFile       `json:"invalid_files,omitempty"`
-	StaleIndexIDs     []string                  `json:"stale_index_ids,omitempty"`
-	MissingIndexPaths []doctorMissingIndexPath  `json:"missing_index_paths,omitempty"`
-	Embeddings        *doctorEmbeddingReadiness `json:"embeddings,omitempty"`
-	Errors            []string                  `json:"errors"`
-}
-
-type doctorInvalidFile struct {
-	Path  string `json:"path"`
-	Error string `json:"error"`
-}
-
-type doctorMissingIndexPath struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
-}
-
-type doctorEmbeddingReadiness struct {
-	Provider string  `json:"provider"`
-	Model    string  `json:"model"`
-	Embedded int     `json:"embedded"`
-	Missing  int     `json:"missing"`
-	Coverage float64 `json:"coverage"`
-}
 
 func Doctor(args []string) error {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
@@ -59,62 +20,32 @@ func Doctor(args []string) error {
 		return err
 	}
 
-	report := doctorReport{OK: true}
 	cfgPath, _ := configPath()
-	report.ConfigPath = cfgPath
-
 	projectPath, err := currentProjectPath()
 	if err != nil {
-		report.OK = false
+		report := doctor.Report{OK: false, ConfigPath: cfgPath, Errors: []string{err.Error()}}
+		if *jsonOut {
+			return printJSON(report)
+		}
+		return printDoctor(report)
+	}
+	vaultPath := doctor.JoinVaultPath(projectPath)
+	dbPath := doctor.JoinDBPath(projectPath)
+
+	e, err := openEngine()
+	if err != nil {
+		report := doctor.Run(context.Background(), nil, doctor.Options{}, projectPath, vaultPath, dbPath, cfgPath)
 		report.Errors = append(report.Errors, err.Error())
 		if *jsonOut {
 			return printJSON(report)
 		}
 		return printDoctor(report)
 	}
-	report.ProjectPath = projectPath
-	report.VaultPath = filepath.Join(projectPath, "vault")
-	report.DBPath = filepath.Join(projectPath, "db", "recall.sqlite")
+	defer e.Close()
 
-	if info, err := os.Stat(report.ProjectPath); err != nil || !info.IsDir() {
-		report.OK = false
-		report.Errors = append(report.Errors, fmt.Sprintf("project path missing or not directory: %s", report.ProjectPath))
-	}
-	if info, err := os.Stat(report.VaultPath); err != nil || !info.IsDir() {
-		report.OK = false
-		report.Errors = append(report.Errors, fmt.Sprintf("vault missing or not directory: %s", report.VaultPath))
-	}
-
-	e, err := openEngine()
-	if err != nil {
-		report.OK = false
-		report.Errors = append(report.Errors, err.Error())
-	} else {
-		defer e.Close()
-		ctx := context.Background()
-		if domains, err := e.Vault().ListDomains(); err != nil {
-			report.OK = false
-			report.Errors = append(report.Errors, err.Error())
-		} else {
-			report.Domains = len(domains)
-		}
-		if count, err := e.MemoryCount(ctx); err != nil {
-			report.OK = false
-			report.Errors = append(report.Errors, err.Error())
-		} else {
-			report.Memories = count
-		}
-		if _, err := os.Stat(report.DBPath); err != nil {
-			report.OK = false
-			report.Errors = append(report.Errors, fmt.Sprintf("db missing: %s", report.DBPath))
-		}
-		if *deep {
-			auditDoctorDeep(ctx, e, &report)
-		}
-		if *embeddings {
-			auditDoctorEmbeddings(ctx, e, &report, strings.TrimSpace(*provider), strings.TrimSpace(*model))
-		}
-	}
+	report := doctor.Run(context.Background(), e, doctor.Options{
+		Deep: *deep, Embeddings: *embeddings, Provider: *provider, Model: *model,
+	}, projectPath, vaultPath, dbPath, cfgPath)
 
 	if *jsonOut {
 		return printJSON(report)
@@ -122,108 +53,7 @@ func Doctor(args []string) error {
 	return printDoctor(report)
 }
 
-func auditDoctorDeep(ctx context.Context, e *recall.Engine, report *doctorReport) {
-	paths, err := e.Vault().Scan()
-	if err != nil {
-		report.OK = false
-		report.Errors = append(report.Errors, err.Error())
-		return
-	}
-	vaultIDs := map[string]string{}
-	for _, rel := range paths {
-		m, err := e.Vault().Read(rel)
-		if err != nil {
-			report.OK = false
-			report.InvalidFiles = append(report.InvalidFiles, doctorInvalidFile{Path: rel, Error: err.Error()})
-			continue
-		}
-		vaultIDs[m.ID] = rel
-	}
-
-	ids, err := e.IndexedIDs(ctx)
-	if err != nil {
-		report.OK = false
-		report.Errors = append(report.Errors, err.Error())
-		return
-	}
-	report.VaultMemories = len(vaultIDs)
-	report.IndexMemories = len(ids)
-
-	for _, id := range ids {
-		rel, err := e.IndexedPath(ctx, id)
-		if err != nil {
-			report.OK = false
-			report.Errors = append(report.Errors, err.Error())
-			continue
-		}
-		if _, ok := vaultIDs[id]; !ok {
-			report.OK = false
-			report.StaleIndexIDs = append(report.StaleIndexIDs, id)
-			report.MissingIndexPaths = append(report.MissingIndexPaths, doctorMissingIndexPath{ID: id, Path: rel})
-		}
-	}
-	sort.Strings(report.StaleIndexIDs)
-	sort.Slice(report.MissingIndexPaths, func(i, j int) bool { return report.MissingIndexPaths[i].ID < report.MissingIndexPaths[j].ID })
-	sort.Slice(report.InvalidFiles, func(i, j int) bool { return report.InvalidFiles[i].Path < report.InvalidFiles[j].Path })
-}
-
-func auditDoctorEmbeddings(ctx context.Context, e *recall.Engine, report *doctorReport, provider, model string) {
-	if provider == "" {
-		provider = "ollama"
-	}
-	if model == "" {
-		model = embedding.DefaultOllamaModel
-	}
-	ids, err := e.IndexedIDs(ctx)
-	if err != nil {
-		report.OK = false
-		report.Errors = append(report.Errors, err.Error())
-		return
-	}
-	embs, err := e.Embeddings(ctx, provider, model)
-	if err != nil {
-		report.OK = false
-		report.Errors = append(report.Errors, err.Error())
-		return
-	}
-	embeddedIDs := map[string]struct{}{}
-	for _, emb := range embs {
-		embeddedIDs[emb.MemoryID] = struct{}{}
-	}
-	missing := 0
-	for _, id := range ids {
-		if _, ok := embeddedIDs[id]; !ok {
-			missing++
-		}
-	}
-	coverage := 1.0
-	if len(ids) > 0 {
-		coverage = float64(len(ids)-missing) / float64(len(ids))
-	}
-	if missing > 0 {
-		report.OK = false
-	}
-	report.Embeddings = &doctorEmbeddingReadiness{Provider: provider, Model: model, Embedded: len(ids) - missing, Missing: missing, Coverage: coverage}
-}
-
-func currentProjectPath() (string, error) {
-	if override := strings.TrimSpace(os.Getenv("RECALL_PROJECT")); override != "" {
-		return resolvePath(override)
-	}
-	if override := strings.TrimSpace(os.Getenv("RECALL_HOME")); override != "" {
-		return resolvePath(override)
-	}
-	cfg, found, err := loadConfig()
-	if err != nil {
-		return "", err
-	}
-	if !found || cfg.ProjectPath == "" {
-		return "", fmt.Errorf("recall is not initialized; run \"recall init\" first")
-	}
-	return cfg.ProjectPath, nil
-}
-
-func printDoctor(r doctorReport) error {
+func printDoctor(r doctor.Report) error {
 	status := "ok"
 	if !r.OK {
 		status = "failed"
@@ -246,7 +76,8 @@ func printDoctor(r doctorReport) error {
 		}
 	}
 	if r.Embeddings != nil {
-		fmt.Printf("embeddings: %s/%s embedded=%d missing=%d coverage=%.2f\n", r.Embeddings.Provider, r.Embeddings.Model, r.Embeddings.Embedded, r.Embeddings.Missing, r.Embeddings.Coverage)
+		fmt.Printf("embeddings: %s/%s embedded=%d missing=%d coverage=%.2f\n",
+			r.Embeddings.Provider, r.Embeddings.Model, r.Embeddings.Embedded, r.Embeddings.Missing, r.Embeddings.Coverage)
 	}
 	for _, err := range r.Errors {
 		fmt.Printf("error:   %s\n", err)

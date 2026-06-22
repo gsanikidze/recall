@@ -1,5 +1,6 @@
 import type {
   Domain, MemoryHit, MemoryDetail, MemoryFilter, GraphData, Status,
+  DoctorReport,
   CreateDomainParams, CreateMemoryParams, UpdateMemoryParams,
 } from './types'
 
@@ -94,4 +95,14 @@ export async function deleteMemory(id: string): Promise<void> {
 
 export async function reindex(): Promise<{ indexed: number; deleted: number }> {
   return request('/api/reindex', { method: 'POST' })
+}
+
+export async function getDoctor(opts: { deep?: boolean; embeddings?: boolean; provider?: string; model?: string } = {}, signal?: AbortSignal): Promise<DoctorReport> {
+  const params = new URLSearchParams()
+  if (opts.deep) params.set('deep', 'true')
+  if (opts.embeddings) params.set('embeddings', 'true')
+  if (opts.provider) params.set('provider', opts.provider)
+  if (opts.model) params.set('model', opts.model)
+  const qs = params.toString()
+  return request<DoctorReport>(`/api/doctor${qs ? `?${qs}` : ''}`, initWithSignal(signal))
 }

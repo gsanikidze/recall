@@ -9,6 +9,41 @@ export interface Status {
   db_path: string
 }
 
+export interface DoctorInvalidFile {
+  path: string
+  error: string
+}
+
+export interface DoctorMissingIndex {
+  id: string
+  path: string
+}
+
+export interface DoctorEmbeddings {
+  provider: string
+  model: string
+  embedded: number
+  missing: number
+  coverage: number
+}
+
+export interface DoctorReport {
+  ok: boolean
+  project_path: string
+  config_path: string
+  vault_path: string
+  db_path: string
+  domains: number
+  memories: number
+  vault_memories?: number
+  index_memories?: number
+  invalid_files?: DoctorInvalidFile[]
+  stale_index_ids?: string[]
+  missing_index_paths?: DoctorMissingIndex[]
+  embeddings?: DoctorEmbeddings
+  errors: string[]
+}
+
 export interface CreateDomainParams {
   name: string
   description?: string

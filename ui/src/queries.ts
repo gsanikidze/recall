@@ -15,6 +15,7 @@ import {
   updateMemory,
   deleteMemory,
   reindex,
+  getDoctor,
 } from '@/api/client'
 import type { MemoryFilter, CreateDomainParams, CreateMemoryParams, UpdateMemoryParams } from '@/api/types'
 
@@ -24,6 +25,7 @@ export const keys = {
   memories: (filter: MemoryFilter) => ['memories', filter] as const,
   memory: (id: string | null) => ['memory', id] as const,
   graph: (domain: string | null) => ['graph', domain] as const,
+  doctor: (deep: boolean, embeddings: boolean) => ['doctor', { deep, embeddings }] as const,
 }
 
 export function useStatus() {
@@ -111,5 +113,23 @@ export function useReindex() {
   return useMutation({
     mutationFn: reindex,
     onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
+export function useDoctor(opts: { deep?: boolean; embeddings?: boolean; provider?: string; model?: string } = {}) {
+  const deep = !!opts.deep
+  const embeddings = !!opts.embeddings
+  return useQuery({
+    queryKey: keys.doctor(deep, embeddings),
+    queryFn: ({ signal }) =>
+      getDoctor(
+        {
+          deep,
+          embeddings,
+          ...(opts.provider ? { provider: opts.provider } : {}),
+          ...(opts.model ? { model: opts.model } : {}),
+        },
+        signal,
+      ),
   })
 }

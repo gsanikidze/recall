@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	fibercors "github.com/gofiber/fiber/v2/middleware/cors"
 
+	"recall/internal/doctor"
 	"recall/internal/embedding"
 	"recall/internal/index"
 	"recall/internal/memory"
@@ -53,6 +54,7 @@ func New(e *recall.Engine) *fiber.App {
 	api.Put("/memories/:id", s.updateMemory)
 	api.Delete("/memories/:id", s.deleteMemory)
 	api.Post("/reindex", s.reindex)
+	api.Get("/doctor", s.doctor)
 
 	return app
 }
@@ -279,6 +281,23 @@ func (s *server) reindex(c *fiber.Ctx) error {
 		return errResp(c, err)
 	}
 	return c.JSON(fiber.Map{"indexed": stats.Indexed, "deleted": stats.Deleted})
+}
+
+func (s *server) doctor(c *fiber.Ctx) error {
+	projectPath := s.engine.ProjectPath()
+	opts := doctor.Options{
+		Deep:       c.QueryBool("deep"),
+		Embeddings: c.QueryBool("embeddings"),
+		Provider:   c.Query("provider", "ollama"),
+		Model:      c.Query("model", embedding.DefaultOllamaModel),
+	}
+	report := doctor.Run(c.Context(), s.engine, opts,
+		projectPath,
+		s.engine.Vault().Root(),
+		filepath.Join(projectPath, "db", "recall.sqlite"),
+		"", // config path is CLI-only; API does not surface it
+	)
+	return c.JSON(report)
 }
 
 // ---- helpers ----

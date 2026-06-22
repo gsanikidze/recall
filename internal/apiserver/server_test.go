@@ -359,6 +359,49 @@ func TestReindexEndpointReturnsStats(t *testing.T) {
 	}
 }
 
+func TestDoctorEndpointReportsCountsAndDeep(t *testing.T) {
+	e, app := newTestApp(t)
+	ctx := context.Background()
+	if _, _, err := e.Add(ctx, recall.AddParams{Title: "Mem one", Body: "body one", Domain: "tools"}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	if _, _, err := e.Add(ctx, recall.AddParams{Title: "Mem two", Body: "body two", Domain: "tools"}); err != nil {
+		t.Fatalf("Add two: %v", err)
+	}
+
+	// plain doctor
+	resp := doReq(t, app, http.MethodGet, "/api/doctor", "")
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s", resp.StatusCode, body)
+	}
+	var got struct {
+		OK       bool   `json:"ok"`
+		Domains  int    `json:"domains"`
+		Memories int    `json:"memories"`
+	}
+	decodeJSON(t, resp, &got)
+	if !got.OK || got.Memories != 2 || got.Domains == 0 {
+		t.Fatalf("doctor = %+v", got)
+	}
+
+	// deep doctor — should report vault_memories and index_memories equal
+	deep := doReq(t, app, http.MethodGet, "/api/doctor?deep=true", "")
+	if deep.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(deep.Body)
+		t.Fatalf("deep status = %d body=%s", deep.StatusCode, body)
+	}
+	var deepGot struct {
+		OK             bool `json:"ok"`
+		VaultMemories  int  `json:"vault_memories"`
+		IndexMemories  int  `json:"index_memories"`
+	}
+	decodeJSON(t, deep, &deepGot)
+	if !deepGot.OK || deepGot.VaultMemories != 2 || deepGot.IndexMemories != 2 {
+		t.Fatalf("deep doctor = %+v", deepGot)
+	}
+}
+
 func TestSearchInvalidFilterReturns422(t *testing.T) {
 	_, app := newTestApp(t)
 	resp := doReq(t, app, http.MethodGet, "/api/memories?lifecycle=bad", "")
