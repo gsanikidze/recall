@@ -1,5 +1,7 @@
 # Recall
 
+![Recall dashboard](docs/assets/recall-readme-cover.png)
+
 Recall is a local-first memory layer for AI agents: **Markdown for humans, SQLite for search, MCP for agents.**
 
 Agents write structured durable facts through CLI/MCP/API. Humans browse, search, inspect, and audit those memories through a read/view-first UI. The source of truth stays as Markdown on your machine; SQLite is a rebuildable local index.

@@ -12,29 +12,35 @@ export function MemoryCard({ memory, selected, onClick }: Props) {
     <button
       onClick={onClick}
       className={cn(
-        'w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors',
-        selected && 'bg-white/10 border-l-2 border-l-violet-500',
+        'w-full rounded-3xl border p-4 text-left transition-all',
+        selected
+          ? 'border-sky-400/40 bg-gradient-to-br from-sky-400/15 to-violet-500/12 shadow-[0_18px_44px_rgba(56,189,248,0.12)]'
+          : 'border-white/10 bg-white/[0.045] hover:border-sky-400/25 hover:bg-white/[0.07]',
       )}
     >
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-[11px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 font-mono">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="rounded-full bg-sky-300 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-950">
           {memory.domain}
         </span>
         {memory.semantic_score != null && memory.semantic_score > 0 && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 font-mono">
+          <span className="rounded-full bg-emerald-400/15 px-2 py-1 font-mono text-[10px] text-emerald-200">
             semantic {memory.semantic_score.toFixed(2)}
           </span>
         )}
         {memory.keyword_score != null && memory.keyword_score > 0 && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 font-mono">
+          <span className="rounded-full bg-sky-400/15 px-2 py-1 font-mono text-[10px] text-sky-200">
             keyword {memory.keyword_score.toFixed(2)}
           </span>
         )}
       </div>
-      <p className="text-sm font-medium text-white/90 truncate">{memory.title}</p>
+      <p className="line-clamp-2 text-sm font-extrabold leading-snug text-white">{memory.title}</p>
       {memory.snippet && (
-        <p className="text-xs text-white/40 truncate mt-0.5">{memory.snippet}</p>
+        <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{memory.snippet}</p>
       )}
+      <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+        <span>score {memory.score.toFixed(2)}</span>
+        <span>★ {memory.importance}</span>
+      </div>
     </button>
   )
 }

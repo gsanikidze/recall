@@ -27,32 +27,31 @@ export function MemoryList({
   ]
 
   return (
-    <div className="flex flex-col h-full border-r border-white/5">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 p-3 border-b border-white/5">
-        <div className="flex-1">
-          <SearchBar value={searchQuery} onChange={onSearchChange} />
+    <div className="flex h-full flex-col">
+      <div className="border-b border-white/10 p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <SearchBar value={searchQuery} onChange={onSearchChange} />
+          </div>
+          <button
+            onClick={onGraph}
+            className={`flex flex-shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all ${graphSelected ? 'bg-gradient-to-r from-sky-400 to-violet-400 text-slate-950 shadow-[0_12px_30px_rgba(56,189,248,0.18)]' : 'border border-white/10 bg-white/[0.05] text-slate-300 hover:border-sky-400/30 hover:bg-sky-400/10 hover:text-white'}`}
+          >
+            <Network className="h-3.5 w-3.5" /> Graph
+          </button>
         </div>
-        <button
-          onClick={onGraph}
-          className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-2 text-xs font-medium rounded-lg transition-colors ${graphSelected ? 'bg-white/15 text-white' : 'bg-white/5 hover:bg-white/10 text-white/70'}`}
-        >
-          <Network className="w-3.5 h-3.5" /> Graph
-        </button>
-      </div>
 
-      <div className="px-3 py-2 border-b border-white/5 space-y-2">
-        <p className="text-[11px] leading-4 text-white/35">
+        <p className="mb-3 text-[11px] leading-4 text-slate-400">
           Agent-written memories. Browse, search, and inspect stored context; write through MCP/CLI/API.
         </p>
-        <div role="group" aria-label="Search mode" className="flex items-center gap-1 rounded-lg bg-white/5 p-1">
+        <div role="group" aria-label="Search mode" className="grid grid-cols-3 gap-1 rounded-2xl bg-white/[0.06] p-1">
           {modes.map(mode => (
             <button
               key={mode.value}
               type="button"
               aria-pressed={searchMode === mode.value}
               onClick={() => onSearchModeChange(mode.value)}
-              className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${searchMode === mode.value ? 'bg-violet-600 text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/5'}`}
+              className={`rounded-xl px-2 py-2 text-[11px] font-bold transition-all ${searchMode === mode.value ? 'bg-gradient-to-r from-sky-400 to-violet-400 text-slate-950' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}
             >
               {mode.label}
             </button>
@@ -60,26 +59,27 @@ export function MemoryList({
         </div>
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="recall-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
         {loading && memories.length === 0 && (
-          <div className="flex items-center justify-center h-24 text-sm text-white/30">
+          <div className="flex h-24 items-center justify-center text-sm text-white/30">
             Loading…
           </div>
         )}
         {!loading && memories.length === 0 && (
-          <div className="flex items-center justify-center h-24 text-sm text-white/30">
+          <div className="flex h-24 items-center justify-center text-sm text-white/30">
             No memories found
           </div>
         )}
-        {memories.map(m => (
-          <MemoryCard
-            key={m.id}
-            memory={m}
-            selected={m.id === selectedId}
-            onClick={() => onSelect(m.id)}
-          />
-        ))}
+        <div className="space-y-3">
+          {memories.map(m => (
+            <MemoryCard
+              key={m.id}
+              memory={m}
+              selected={m.id === selectedId}
+              onClick={() => onSelect(m.id)}
+            />
+          ))}
+        </div>
       </div>
     </div>
   )

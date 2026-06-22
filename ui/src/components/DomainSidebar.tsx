@@ -1,4 +1,4 @@
-import { Layers, RefreshCw } from 'lucide-react'
+import { Database, Layers, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Domain } from '@/api/types'
 
@@ -10,51 +10,67 @@ interface Props {
   reindexing: boolean
 }
 
+const domainColors = ['bg-sky-400', 'bg-emerald-400', 'bg-amber-300', 'bg-rose-400', 'bg-violet-400', 'bg-slate-400']
+
 export function DomainSidebar({
   domains, selected, onSelect, onReindex, reindexing,
 }: Props) {
   return (
-    <aside className="flex flex-col h-full bg-[#141414] border-r border-white/5">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
-        <Layers className="w-4 h-4 text-violet-400" />
-        <span className="text-sm font-semibold text-white/80 tracking-wide">recall</span>
+    <aside className="flex h-[calc(100%-2rem)] flex-col px-4 pb-4 pt-5">
+      <div className="mb-6 flex items-center gap-3 px-1">
+        <div className="grid h-12 w-12 place-items-center rounded-2xl border border-white/15 bg-gradient-to-br from-sky-400/25 to-violet-500/30 shadow-[0_18px_50px_rgba(56,189,248,0.18)]">
+          <Layers className="h-5 w-5 text-sky-200" />
+        </div>
+        <div>
+          <div className="text-base font-extrabold tracking-tight text-white">Recall</div>
+          <div className="text-xs text-slate-400">Local memory vault</div>
+        </div>
       </div>
 
-      {/* Domain list */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="mb-3 px-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Vault</div>
+      <div className="recall-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
         <button
           onClick={() => onSelect(null)}
           className={cn(
-            'w-full text-left px-4 py-1.5 text-sm hover:bg-white/5 transition-colors',
-            !selected ? 'text-violet-300 font-medium' : 'text-white/50',
+            'mb-2 flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left text-sm transition-all',
+            !selected
+              ? 'border border-sky-400/25 bg-gradient-to-r from-sky-400/15 to-violet-500/15 text-white shadow-[0_14px_34px_rgba(56,189,248,0.10)]'
+              : 'text-slate-400 hover:bg-white/[0.05] hover:text-white',
           )}
         >
-          All memories
+          <span className="flex items-center gap-3 font-semibold"><span className="h-2.5 w-2.5 rounded-full bg-sky-400 shadow-[0_0_18px_currentColor]" />All memories</span>
+          <span className="text-xs text-slate-500">all</span>
         </button>
-        {domains.map(d => (
+        {domains.map((d, index) => (
           <button
             key={d.name}
             onClick={() => onSelect(d.name)}
             title={d.description}
             className={cn(
-              'w-full text-left px-4 py-1.5 text-sm hover:bg-white/5 transition-colors truncate',
-              selected === d.name ? 'text-violet-300 font-medium' : 'text-white/50',
+              'mb-2 flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left text-sm transition-all',
+              selected === d.name
+                ? 'border border-sky-400/25 bg-gradient-to-r from-sky-400/15 to-violet-500/15 text-white shadow-[0_14px_34px_rgba(56,189,248,0.10)]'
+                : 'text-slate-400 hover:bg-white/[0.05] hover:text-white',
             )}
           >
-            {d.name}
+            <span className="flex min-w-0 items-center gap-3 font-semibold">
+              <span className={cn('h-2.5 w-2.5 flex-shrink-0 rounded-full shadow-[0_0_18px_currentColor]', domainColors[index % domainColors.length])} />
+              <span className="truncate">{d.name}</span>
+            </span>
           </button>
         ))}
       </div>
 
-      {/* Footer actions */}
-      <div className="border-t border-white/5 p-2 flex flex-col gap-1">
+      <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <Database className="h-3.5 w-3.5" /> Index
+        </div>
         <button
           onClick={onReindex}
           disabled={reindexing}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs text-white/40 hover:text-white/70 hover:bg-white/5 rounded transition-colors disabled:opacity-40"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-300 transition-colors hover:border-sky-400/30 hover:bg-sky-400/10 hover:text-white disabled:opacity-40"
         >
-          <RefreshCw className={cn('w-3 h-3', reindexing && 'animate-spin')} />
+          <RefreshCw className={cn('h-3.5 w-3.5', reindexing && 'animate-spin')} />
           {reindexing ? 'Reindexing…' : 'Reindex vault'}
         </button>
       </div>
