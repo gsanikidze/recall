@@ -13,8 +13,8 @@ func main() {
 	args := os.Args[1:]
 
 	if len(args) == 0 {
-		// No subcommand: launch the interactive TUI.
-		runTUI()
+		// No subcommand: print help.
+		printHelp()
 		return
 	}
 
