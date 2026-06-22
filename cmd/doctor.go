@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 
 	"recall/internal/doctor"
 	"recall/internal/embedding"
@@ -76,8 +77,18 @@ func printDoctor(r doctor.Report) error {
 		}
 	}
 	if r.Embeddings != nil {
-		fmt.Printf("embeddings: %s/%s embedded=%d missing=%d coverage=%.2f\n",
-			r.Embeddings.Provider, r.Embeddings.Model, r.Embeddings.Embedded, r.Embeddings.Missing, r.Embeddings.Coverage)
+		fmt.Printf("embeddings: %s/%s", r.Embeddings.Provider, r.Embeddings.Model)
+		if r.Embeddings.ServerURL != "" {
+			fmt.Printf(" server=%s", r.Embeddings.ServerURL)
+		}
+		fmt.Printf(" reachable=%v model_available=%v embedded=%d missing=%d coverage=%.2f\n",
+			r.Embeddings.Reachable, r.Embeddings.ModelAvailable, r.Embeddings.Embedded, r.Embeddings.Missing, r.Embeddings.Coverage)
+		if r.Embeddings.ServerError != "" {
+			fmt.Printf("embedding server: %s\n", r.Embeddings.ServerError)
+		}
+		if len(r.Embeddings.AvailableModels) > 0 {
+			fmt.Printf("embedding models: %s\n", strings.Join(r.Embeddings.AvailableModels, ", "))
+		}
 	}
 	for _, err := range r.Errors {
 		fmt.Printf("error:   %s\n", err)

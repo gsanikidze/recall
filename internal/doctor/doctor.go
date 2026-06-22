@@ -53,13 +53,19 @@ type MissingIndex struct {
 	Path string `json:"path"`
 }
 
-// EmbeddingReady summarises embedding coverage for indexed memories.
+// EmbeddingReady summarises embedding coverage for indexed memories plus a
+// live probe of the embedding backend (server reachable, model pulled).
 type EmbeddingReady struct {
-	Provider string  `json:"provider"`
-	Model    string  `json:"model"`
-	Embedded int     `json:"embedded"`
-	Missing  int     `json:"missing"`
-	Coverage float64 `json:"coverage"`
+	Provider         string   `json:"provider"`
+	Model            string   `json:"model"`
+	ServerURL        string   `json:"server_url,omitempty"`
+	Reachable        bool     `json:"reachable"`
+	ModelAvailable   bool     `json:"model_available"`
+	ServerError      string   `json:"server_error,omitempty"`
+	AvailableModels  []string `json:"available_models,omitempty"`
+	Embedded         int      `json:"embedded"`
+	Missing          int      `json:"missing"`
+	Coverage         float64  `json:"coverage"`
 }
 
 // Run performs the configured audits against the engine and returns a Report.
@@ -169,16 +175,50 @@ func auditEmbeddings(ctx context.Context, e *recall.Engine, report *Report, prov
 	if model == "" {
 		model = embedding.DefaultOllamaModel
 	}
+
+	ready := &EmbeddingReady{Provider: provider, Model: model}
+
+	// Probe the backend if the provider supports it. Ollama exposes server
+	// reachability + model availability; fake/test providers skip the probe
+	// and report as reachable so existing tests keep passing.
+	p, pErr := embedding.NewProvider(provider, model, "")
+	if pErr != nil {
+		report.OK = false
+		report.Errors = append(report.Errors, pErr.Error())
+		report.Embeddings = ready
+		return
+	}
+	if prober, ok := p.(embedding.Prober); ok {
+		probe, _ := prober.Probe(ctx)
+		if probe != nil {
+			ready.Reachable = probe.Reachable
+			ready.ModelAvailable = probe.ModelAvailable
+			ready.ServerError = probe.ServerError
+			ready.AvailableModels = probe.AvailableModels
+			if o, ok := p.(interface{ BaseURL() string }); ok {
+				ready.ServerURL = o.BaseURL()
+			}
+			if !probe.Reachable || !probe.ModelAvailable {
+				report.OK = false
+			}
+		}
+	} else {
+		ready.Reachable = true
+		ready.ModelAvailable = true
+	}
+
 	ids, err := e.IndexedIDs(ctx)
 	if err != nil {
 		report.OK = false
 		report.Errors = append(report.Errors, err.Error())
+		report.Embeddings = ready
 		return
 	}
 	embs, err := e.Embeddings(ctx, provider, model)
 	if err != nil {
 		report.OK = false
 		report.Errors = append(report.Errors, err.Error())
+		report.Embeddings = ready
 		return
 	}
 	embeddedIDs := map[string]struct{}{}
@@ -198,7 +238,10 @@ func auditEmbeddings(ctx context.Context, e *recall.Engine, report *Report, prov
 	if missing > 0 {
 		report.OK = false
 	}
-	report.Embeddings = &EmbeddingReady{Provider: provider, Model: model, Embedded: len(ids) - missing, Missing: missing, Coverage: coverage}
+	ready.Embedded = len(ids) - missing
+	ready.Missing = missing
+	ready.Coverage = coverage
+	report.Embeddings = ready
 }
 
 // JoinDBPath returns the conventional db path for a project root.

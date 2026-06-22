@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Activity, AlertTriangle, CheckCircle2, RefreshCw, Stethoscope } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDoctor } from '@/queries'
-import type { DoctorReport } from '@/api/types'
+import type { DoctorEmbeddings, DoctorReport } from '@/api/types'
 
 function pct(n: number) {
   return `${Math.round(n * 100)}%`
@@ -25,6 +25,94 @@ function IssueRow({ icon, label, count }: { icon: string; label: string; count: 
         {label}
       </span>
       <span className="font-bold tabular-nums">{count}</span>
+    </div>
+  )
+}
+
+function StatusPill({ ok, label, detail }: { ok: boolean; label: string; detail?: string }) {
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-between rounded-md px-2 py-1 text-[11px]',
+        ok
+          ? 'bg-emerald-500/5 text-emerald-200/90'
+          : 'bg-rose-500/10 text-rose-200/90',
+      )}
+      title={detail}
+    >
+      <span className="flex items-center gap-1.5">
+        <span aria-hidden>{ok ? '✓' : '✗'}</span>
+        {label}
+      </span>
+      {detail && <span className="truncate pl-2 text-[10px] opacity-70">{detail}</span>}
+    </div>
+  )
+}
+
+function EmbeddingsBlock({ emb }: { emb: DoctorEmbeddings }) {
+  // Backend healthy = reachable AND model available. Coverage gaps are a
+  // separate, non-fatal signal shown via the existing bar.
+  const backendOk = emb.reachable && emb.model_available
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between text-[11px] text-slate-400">
+        <span className="inline-flex items-center gap-1">
+          <Activity className="h-3 w-3" /> Embeddings
+        </span>
+        <span className="truncate pl-2 text-[10px] text-slate-500" title={`${emb.provider}/${emb.model}`}>
+          {emb.provider}/{emb.model}
+        </span>
+      </div>
+
+      <StatusPill
+        ok={emb.reachable}
+        label="Ollama server"
+        detail={emb.server_url ?? (emb.reachable ? 'reachable' : 'unreachable')}
+      />
+      <StatusPill
+        ok={emb.model_available}
+        label="Model pulled"
+        detail={
+          emb.model_available
+            ? emb.model
+            : emb.server_error || `run \`ollama pull ${emb.model}\``
+        }
+      />
+
+      {/* Coverage bar — only meaningful when backend is healthy */}
+      {backendOk && (
+        <>
+          <div className="mt-0.5 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Coverage</span>
+            <span className="tabular-nums">
+              {emb.embedded}/{emb.embedded + emb.missing}
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+            <div
+              className={cn(
+                'h-full rounded-full transition-all',
+                emb.coverage >= 0.99
+                  ? 'bg-emerald-400'
+                  : emb.coverage >= 0.5
+                    ? 'bg-amber-400'
+                    : 'bg-rose-400',
+              )}
+              style={{ width: pct(emb.coverage) }}
+            />
+          </div>
+        </>
+      )}
+
+      {/* List available models when server is up but configured model missing */}
+      {!emb.model_available &&
+        emb.reachable &&
+        emb.available_models &&
+        emb.available_models.length > 0 && (
+          <div className="rounded-md bg-white/[0.02] px-2 py-1 text-[10px] text-slate-500">
+            pulled: {emb.available_models.join(', ')}
+          </div>
+        )}
     </div>
   )
 }
@@ -104,31 +192,7 @@ function Body({ report, loading, deep, onToggleDeep, onRefresh }: {
         </div>
       )}
 
-      {report.embeddings && (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
-            <span className="inline-flex items-center gap-1">
-              <Activity className="h-3 w-3" /> Embeddings
-            </span>
-            <span className="tabular-nums">
-              {report.embeddings.embedded}/{report.embeddings.embedded + report.embeddings.missing}
-            </span>
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-            <div
-              className={cn(
-                'h-full rounded-full transition-all',
-                report.embeddings.coverage >= 0.99
-                  ? 'bg-emerald-400'
-                  : report.embeddings.coverage >= 0.5
-                    ? 'bg-amber-400'
-                    : 'bg-rose-400',
-              )}
-              style={{ width: pct(report.embeddings.coverage) }}
-            />
-          </div>
-        </div>
-      )}
+      {report.embeddings && <EmbeddingsBlock emb={report.embeddings} />}
 
       {report.errors && report.errors.length > 0 && (
         <ul className="flex flex-col gap-0.5">

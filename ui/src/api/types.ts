@@ -22,6 +22,11 @@ export interface DoctorMissingIndex {
 export interface DoctorEmbeddings {
   provider: string
   model: string
+  server_url?: string
+  reachable: boolean
+  model_available: boolean
+  server_error?: string
+  available_models?: string[]
   embedded: number
   missing: number
   coverage: number

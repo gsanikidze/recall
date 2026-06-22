@@ -118,7 +118,9 @@ export function useReindex() {
 
 export function useDoctor(opts: { deep?: boolean; embeddings?: boolean; provider?: string; model?: string } = {}) {
   const deep = !!opts.deep
-  const embeddings = !!opts.embeddings
+  // Embeddings audit runs by default so the panel surfaces Ollama/model
+  // problems without the user having to opt in.
+  const embeddings = opts.embeddings !== false
   return useQuery({
     queryKey: keys.doctor(deep, embeddings),
     queryFn: ({ signal }) =>
