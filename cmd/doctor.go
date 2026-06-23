@@ -66,7 +66,7 @@ func printDoctor(r doctor.Report) error {
 	fmt.Printf("db:      %s\n", r.DBPath)
 	fmt.Printf("domains: %d\n", r.Domains)
 	fmt.Printf("memories: %d\n", r.Memories)
-	if r.VaultMemories > 0 || r.IndexMemories > 0 || len(r.InvalidFiles) > 0 || len(r.StaleIndexIDs) > 0 {
+	if r.VaultMemories > 0 || r.IndexMemories > 0 || len(r.InvalidFiles) > 0 || len(r.StaleIndexIDs) > 0 || len(r.UnindexedVaultFiles) > 0 || len(r.DuplicateVaultIDs) > 0 {
 		fmt.Printf("vault memories: %d\n", r.VaultMemories)
 		fmt.Printf("index memories: %d\n", r.IndexMemories)
 		for _, invalid := range r.InvalidFiles {
@@ -74,6 +74,12 @@ func printDoctor(r doctor.Report) error {
 		}
 		for _, missing := range r.MissingIndexPaths {
 			fmt.Printf("missing indexed file: %s %s\n", missing.ID, missing.Path)
+		}
+		for _, unindexed := range r.UnindexedVaultFiles {
+			fmt.Printf("unindexed vault file: %s %s\n", unindexed.ID, unindexed.Path)
+		}
+		for _, dup := range r.DuplicateVaultIDs {
+			fmt.Printf("duplicate vault id: %s %s\n", dup.ID, strings.Join(dup.Paths, ", "))
 		}
 	}
 	if r.Embeddings != nil {

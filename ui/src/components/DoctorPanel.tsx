@@ -226,7 +226,9 @@ function Body({ report, loading, deep, onToggleDeep, onRefresh }: {
   const issueCount =
     (report.invalid_files?.length ?? 0) +
     (report.stale_index_ids?.length ?? 0) +
-    (report.missing_index_paths?.length ?? 0)
+    (report.missing_index_paths?.length ?? 0) +
+    (report.unindexed_vault_files?.length ?? 0) +
+    (report.duplicate_vault_ids?.length ?? 0)
 
   const healthy = report.ok
 
@@ -276,6 +278,12 @@ function Body({ report, loading, deep, onToggleDeep, onRefresh }: {
           )}
           {report.missing_index_paths && report.missing_index_paths.length > 0 && (
             <IssueRow icon="∅" label="Missing vault files" count={report.missing_index_paths.length} />
+          )}
+          {report.unindexed_vault_files && report.unindexed_vault_files.length > 0 && (
+            <IssueRow icon="+" label="Unindexed vault files" count={report.unindexed_vault_files.length} />
+          )}
+          {report.duplicate_vault_ids && report.duplicate_vault_ids.length > 0 && (
+            <IssueRow icon="≡" label="Duplicate vault IDs" count={report.duplicate_vault_ids.length} />
           )}
         </div>
       )}

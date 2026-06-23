@@ -25,21 +25,23 @@ type Options struct {
 
 // Report is the audit result. JSON tags are stable: CLI tests assert on them.
 type Report struct {
-	OK                bool            `json:"ok"`
-	ProjectPath       string          `json:"project_path"`
-	ConfigPath        string          `json:"config_path"`
-	VaultPath         string          `json:"vault_path"`
-	DBPath            string          `json:"db_path"`
-	Domains           int             `json:"domains"`
-	Memories          int             `json:"memories"`
-	VaultMemories     int             `json:"vault_memories,omitempty"`
-	IndexMemories     int             `json:"index_memories,omitempty"`
-	InvalidFiles      []InvalidFile   `json:"invalid_files,omitempty"`
-	StaleIndexIDs     []string        `json:"stale_index_ids,omitempty"`
-	MissingIndexPaths []MissingIndex  `json:"missing_index_paths,omitempty"`
-	Embeddings        *EmbeddingReady `json:"embeddings,omitempty"`
-	Suggestions       []Suggestion    `json:"suggestions,omitempty"`
-	Errors            []string        `json:"errors"`
+	OK                  bool                 `json:"ok"`
+	ProjectPath         string               `json:"project_path"`
+	ConfigPath          string               `json:"config_path"`
+	VaultPath           string               `json:"vault_path"`
+	DBPath              string               `json:"db_path"`
+	Domains             int                  `json:"domains"`
+	Memories            int                  `json:"memories"`
+	VaultMemories       int                  `json:"vault_memories,omitempty"`
+	IndexMemories       int                  `json:"index_memories,omitempty"`
+	InvalidFiles        []InvalidFile        `json:"invalid_files,omitempty"`
+	StaleIndexIDs       []string             `json:"stale_index_ids,omitempty"`
+	MissingIndexPaths   []MissingIndex       `json:"missing_index_paths,omitempty"`
+	UnindexedVaultFiles []UnindexedVaultFile `json:"unindexed_vault_files,omitempty"`
+	DuplicateVaultIDs   []DuplicateVaultID   `json:"duplicate_vault_ids,omitempty"`
+	Embeddings          *EmbeddingReady      `json:"embeddings,omitempty"`
+	Suggestions         []Suggestion         `json:"suggestions,omitempty"`
+	Errors              []string             `json:"errors"`
 }
 
 // InvalidFile is a vault markdown file that failed to parse.
@@ -52,6 +54,18 @@ type InvalidFile struct {
 type MissingIndex struct {
 	ID   string `json:"id"`
 	Path string `json:"path"`
+}
+
+// UnindexedVaultFile is a valid vault memory file absent from SQLite.
+type UnindexedVaultFile struct {
+	ID   string `json:"id"`
+	Path string `json:"path"`
+}
+
+// DuplicateVaultID is a memory id appearing in more than one vault file.
+type DuplicateVaultID struct {
+	ID    string   `json:"id"`
+	Paths []string `json:"paths"`
 }
 
 // Suggestion is a copy-pasteable prompt the user can hand to an AI agent to
@@ -142,6 +156,8 @@ func auditDeep(ctx context.Context, e *recall.Engine, report *Report) {
 		return
 	}
 	vaultIDs := map[string]string{}
+	vaultPathsByID := map[string][]string{}
+	validVaultFiles := 0
 	for _, rel := range paths {
 		m, err := e.Vault().Read(rel)
 		if err != nil {
@@ -149,7 +165,9 @@ func auditDeep(ctx context.Context, e *recall.Engine, report *Report) {
 			report.InvalidFiles = append(report.InvalidFiles, InvalidFile{Path: rel, Error: err.Error()})
 			continue
 		}
+		validVaultFiles++
 		vaultIDs[m.ID] = rel
+		vaultPathsByID[m.ID] = append(vaultPathsByID[m.ID], rel)
 	}
 
 	ids, err := e.IndexedIDs(ctx)
@@ -158,8 +176,25 @@ func auditDeep(ctx context.Context, e *recall.Engine, report *Report) {
 		report.Errors = append(report.Errors, err.Error())
 		return
 	}
-	report.VaultMemories = len(vaultIDs)
+	report.VaultMemories = validVaultFiles
 	report.IndexMemories = len(ids)
+	indexedIDs := map[string]struct{}{}
+	for _, id := range ids {
+		indexedIDs[id] = struct{}{}
+	}
+	for id, rel := range vaultIDs {
+		if _, ok := indexedIDs[id]; !ok {
+			report.OK = false
+			report.UnindexedVaultFiles = append(report.UnindexedVaultFiles, UnindexedVaultFile{ID: id, Path: rel})
+		}
+	}
+	for id, vaultPaths := range vaultPathsByID {
+		if len(vaultPaths) > 1 {
+			report.OK = false
+			sort.Strings(vaultPaths)
+			report.DuplicateVaultIDs = append(report.DuplicateVaultIDs, DuplicateVaultID{ID: id, Paths: vaultPaths})
+		}
+	}
 
 	for _, id := range ids {
 		rel, err := e.IndexedPath(ctx, id)
@@ -176,6 +211,8 @@ func auditDeep(ctx context.Context, e *recall.Engine, report *Report) {
 	}
 	sort.Strings(report.StaleIndexIDs)
 	sort.Slice(report.MissingIndexPaths, func(i, j int) bool { return report.MissingIndexPaths[i].ID < report.MissingIndexPaths[j].ID })
+	sort.Slice(report.UnindexedVaultFiles, func(i, j int) bool { return report.UnindexedVaultFiles[i].Path < report.UnindexedVaultFiles[j].Path })
+	sort.Slice(report.DuplicateVaultIDs, func(i, j int) bool { return report.DuplicateVaultIDs[i].ID < report.DuplicateVaultIDs[j].ID })
 	sort.Slice(report.InvalidFiles, func(i, j int) bool { return report.InvalidFiles[i].Path < report.InvalidFiles[j].Path })
 }
 
@@ -348,6 +385,20 @@ func buildSuggestions(r *Report) []Suggestion {
 					"Run `recall reindex` to rebuild the index from the current vault. "+
 					"If those memories were deleted intentionally, reindexing will clean up the stale rows.",
 				len(r.MissingIndexPaths),
+			),
+		})
+	}
+
+	// --- Vault/index drift: valid vault files absent from SQLite or duplicate ids ---
+	if len(r.UnindexedVaultFiles) > 0 || len(r.DuplicateVaultIDs) > 0 {
+		out = append(out, Suggestion{
+			ID:       "vault-index-drift",
+			Title:    "Vault/index drift detected",
+			Severity: "warning",
+			Prompt: fmt.Sprintf(
+				"Recall found %d valid vault file(s) absent from SQLite and %d duplicate vault id(s). "+
+					"Run `recall reindex` to rebuild the SQLite index from the vault. If duplicate ids remain, edit or remove duplicate vault files first, then run `recall reindex` again.",
+				len(r.UnindexedVaultFiles), len(r.DuplicateVaultIDs),
 			),
 		})
 	}

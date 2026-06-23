@@ -92,9 +92,108 @@ func parseRelationshipsFlag(raw string) ([]memory.Relationship, error) {
 	}
 	var rels []memory.Relationship
 	if err := json.Unmarshal([]byte(raw), &rels); err != nil {
-		return nil, fmt.Errorf("add: --relationships must be JSON array of {target_id,type,note}: %w", err)
+		return nil, fmt.Errorf("--relationships must be JSON array of {target_id,type,note}: %w", err)
 	}
 	return rels, nil
+}
+
+// Update edits an existing memory in place. Only flags that are present are changed.
+func Update(args []string) error {
+	fs := flag.NewFlagSet("update", flag.ContinueOnError)
+	title := fs.String("title", "", "memory title")
+	body := fs.String("body", "", "memory body; if omitted and stdin is piped, read body from stdin")
+	tags := fs.String("tags", "", "comma-separated tags; pass empty string to clear")
+	project := fs.String("project", "", "project grouping key; pass empty string to clear")
+	lifecycle := fs.String("lifecycle", "", "evergreen or expires")
+	expires := fs.String("expires", "", "expiry date YYYY-MM-DD (with --lifecycle expires)")
+	source := fs.String("source", "", "who/what produced this memory; pass empty string to clear")
+	links := fs.String("links", "", "comma-separated related memory ids; pass empty string to clear")
+	relationshipsJSON := fs.String("relationships", "", "JSON array of typed relationships [{target_id,type,note}]; pass [] to clear")
+	importance := fs.Int("importance", 0, "importance rank 1-5")
+	jsonOut := fs.Bool("json", false, "print JSON")
+	id := ""
+	parseArgs := args
+	if len(args) > 0 && !strings.HasPrefix(args[0], "--") {
+		id = args[0]
+		parseArgs = args[1:]
+	}
+	if err := fs.Parse(parseArgs); err != nil {
+		return err
+	}
+	if id == "" && fs.NArg() == 1 {
+		id = fs.Arg(0)
+	}
+	if id == "" || (len(args) > 0 && !strings.HasPrefix(args[0], "--") && fs.NArg() != 0) || (len(args) == 0 || strings.HasPrefix(args[0], "--")) && fs.NArg() != 1 {
+		return fmt.Errorf("usage: recall update <id> [--title TITLE] [--body BODY] [--tags LIST] [--project PROJECT] [--lifecycle evergreen|expires] [--expires YYYY-MM-DD] [--source SOURCE] [--links IDS] [--relationships JSON] [--importance N] [--json]")
+	}
+	seen := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { seen[f.Name] = true })
+
+	params := recall.UpdateParams{}
+	changed := false
+	setString := func(name string, value string, target **string) {
+		if seen[name] {
+			v := value
+			*target = &v
+			changed = true
+		}
+	}
+	setString("title", *title, &params.Title)
+	setString("project", *project, &params.Project)
+	setString("lifecycle", *lifecycle, &params.Lifecycle)
+	setString("expires", *expires, &params.ExpiresOn)
+	setString("source", *source, &params.Source)
+	if seen["body"] {
+		v := *body
+		params.Body = &v
+		changed = true
+	} else if piped, err := readStdin(); err != nil {
+		return err
+	} else if strings.TrimSpace(piped) != "" {
+		params.Body = &piped
+		changed = true
+	}
+	if seen["tags"] {
+		v := splitList(*tags)
+		params.Tags = &v
+		changed = true
+	}
+	if seen["links"] {
+		v := splitList(*links)
+		params.Links = &v
+		changed = true
+	}
+	if seen["relationships"] {
+		rels, err := parseRelationshipsFlag(*relationshipsJSON)
+		if err != nil {
+			return err
+		}
+		params.Relationships = &rels
+		changed = true
+	}
+	if seen["importance"] {
+		v := *importance
+		params.Importance = &v
+		changed = true
+	}
+	if !changed {
+		return fmt.Errorf("update: at least one field flag or stdin body is required")
+	}
+
+	e, err := openEngine()
+	if err != nil {
+		return err
+	}
+	defer e.Close()
+	m, relPath, err := e.Update(context.Background(), id, params)
+	if err != nil {
+		return err
+	}
+	if *jsonOut {
+		return printJSON(view.FromMemory(m, relPath))
+	}
+	fmt.Printf("updated %s\n%s\n", m.ID, filepath.Join("vault", relPath))
+	return nil
 }
 
 type embedArgs struct {

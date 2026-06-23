@@ -460,6 +460,26 @@ func TestAddSearchGetDeleteJSONFlow(t *testing.T) {
 		t.Fatalf("get json output = %s", out)
 	}
 
+	out = captureStdout(t, func() {
+		if err := Update([]string{id, "--title", "Updated Memory", "--body", "Updated body", "--tags", "edited,smoke", "--project", "recall", "--lifecycle", "evergreen", "--source", "cli-test", "--links", "01LINK000000000000000001", "--relationships", `[{"target_id":"01TARGET000000000000000002","type":"depends_on","note":"updated edge"}]`, "--importance", "4", "--json"}); err != nil {
+			t.Fatalf("Update json: %v", err)
+		}
+	})
+	for _, want := range []string{`"id": "` + id + `"`, `"path"`, `"title": "Updated Memory"`, `"body": "Updated body"`, `"project": "recall"`, `"source": "cli-test"`, `"importance": 4`, `"type": "depends_on"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("update json output missing %q: %s", want, out)
+		}
+	}
+
+	out = captureStdout(t, func() {
+		if err := Get([]string{id, "--json"}); err != nil {
+			t.Fatalf("Get updated json: %v", err)
+		}
+	})
+	if !strings.Contains(out, `"title": "Updated Memory"`) || !strings.Contains(out, "Updated body") || !strings.Contains(out, `"path"`) {
+		t.Fatalf("get updated json output = %s", out)
+	}
+
 	if err := Add([]string{"--title", "Second Memory", "--domain", "tools", "--body", "Another memory"}); err != nil {
 		t.Fatalf("Add second memory: %v", err)
 	}

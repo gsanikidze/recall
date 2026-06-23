@@ -19,6 +19,16 @@ export interface DoctorMissingIndex {
   path: string
 }
 
+export interface DoctorUnindexedVaultFile {
+  id: string
+  path: string
+}
+
+export interface DoctorDuplicateVaultID {
+  id: string
+  paths: string[]
+}
+
 export interface DoctorEmbeddings {
   provider: string
   model: string
@@ -53,6 +63,8 @@ export interface DoctorReport {
   invalid_files?: DoctorInvalidFile[]
   stale_index_ids?: string[]
   missing_index_paths?: DoctorMissingIndex[]
+  unindexed_vault_files?: DoctorUnindexedVaultFile[]
+  duplicate_vault_ids?: DoctorDuplicateVaultID[]
   embeddings?: DoctorEmbeddings
   suggestions?: DoctorSuggestion[]
   errors: string[]
