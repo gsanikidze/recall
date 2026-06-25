@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Abstract geometric logo">
+  <defs>
+    <linearGradient id="blue" x1="284" y1="204" x2="515" y2="506" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07c8ea"/>
+      <stop offset="1" stop-color="#0878f8"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="572" y1="504" x2="807" y2="209" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5a33e6"/>
+      <stop offset="1" stop-color="#b855f1"/>
+    </linearGradient>
+    <linearGradient id="pink" x1="294" y1="767" x2="482" y2="522" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f71f83"/>
+      <stop offset="1" stop-color="#ff8290"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="514" y1="524" x2="842" y2="796" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd318"/>
+      <stop offset="1" stop-color="#ff7513"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="225" y="204" width="267" height="301" rx="10" fill="url(#blue)"/>
+  <circle cx="661" cy="356" r="152" fill="url(#purple)"/>
+  <circle cx="364" cy="656" r="132" fill="url(#pink)"/>
+  <path d="M515 521
+           Q515 511 525 511
+           H629
+           Q637 511 643 518
+           L840 767
+           Q852 782 833 787
+           H525
+           Q515 787 515 777
+           Z" fill="url(#orange)"/>
+</svg>

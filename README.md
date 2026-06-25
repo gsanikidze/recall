@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="ui/src/assets/recall-logo.svg" alt="Recall logo" width="120" />
+</p>
+
 # Recall
 
 ![Recall dashboard](docs/assets/recall-readme-cover.png)
