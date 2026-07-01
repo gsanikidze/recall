@@ -27,14 +27,14 @@ type Options struct {
 
 // FixResult records one repair action run by doctor --fix.
 type FixResult struct {
-	Action  string `json:"action"`
-	OK      bool   `json:"ok"`
-	Message string `json:"message,omitempty"`
-	Indexed int    `json:"indexed,omitempty"`
-	Deleted int    `json:"deleted,omitempty"`
-	Embedded int   `json:"embedded,omitempty"`
-	Skipped  int   `json:"skipped,omitempty"`
-	Failed   int   `json:"failed,omitempty"`
+	Action   string `json:"action"`
+	OK       bool   `json:"ok"`
+	Message  string `json:"message,omitempty"`
+	Indexed  int    `json:"indexed,omitempty"`
+	Deleted  int    `json:"deleted,omitempty"`
+	Embedded int    `json:"embedded,omitempty"`
+	Skipped  int    `json:"skipped,omitempty"`
+	Failed   int    `json:"failed,omitempty"`
 }
 
 // Report is the audit result. JSON tags are stable: CLI tests assert on them.
