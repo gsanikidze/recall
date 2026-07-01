@@ -37,6 +37,7 @@ func New(e *recall.Engine) *fiber.App {
 
 	api := app.Group("/api",
 		dnsRebindGuard,
+		unsafeMethodGuard,
 		fibercors.New(fibercors.Config{
 			AllowOriginsFunc: func(origin string) bool { return allowedOrigins[origin] },
 			AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
@@ -324,6 +325,31 @@ func dnsRebindGuard(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).SendString("forbidden")
 	}
 	return c.Next()
+}
+
+// unsafeMethodGuard prevents browser-shaped cross-origin writes and non-JSON
+// unsafe requests from reaching the unauthenticated local API.
+func unsafeMethodGuard(c *fiber.Ctx) error {
+	if !isUnsafeMethod(c.Method()) {
+		return c.Next()
+	}
+	origin := c.Get("Origin")
+	if origin != "" && !allowedOrigins[origin] {
+		return c.Status(fiber.StatusForbidden).SendString("forbidden")
+	}
+	contentType := strings.ToLower(c.Get("Content-Type"))
+	if !strings.HasPrefix(contentType, "application/json") {
+		return c.Status(fiber.StatusUnsupportedMediaType).SendString("content-type must be application/json")
+	}
+	return c.Next()
+}
+
+func isUnsafeMethod(method string) bool {
+	switch method {
+	case fiber.MethodPost, fiber.MethodPut, fiber.MethodPatch, fiber.MethodDelete:
+		return true
+	}
+	return false
 }
 
 func isSafeHost(host string) bool {

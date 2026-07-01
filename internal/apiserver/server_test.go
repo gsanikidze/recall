@@ -123,6 +123,37 @@ func TestCORSAllowlistForViteOrigins(t *testing.T) {
 	}
 }
 
+func TestUnsafeMethodsRejectMaliciousOrigin(t *testing.T) {
+	_, app := newTestApp(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/memories", bytes.NewBufferString(`{"title":"pwn","body":"x","domain":"tools"}`))
+	req.Host = "localhost"
+	req.Header.Set("Origin", "https://evil.example")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("Test: %v", err)
+	}
+	if resp.StatusCode != http.StatusForbidden {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 403 body=%s", resp.StatusCode, body)
+	}
+}
+
+func TestUnsafeMethodsRequireJSONContentType(t *testing.T) {
+	_, app := newTestApp(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/memories", strings.NewReader("title=pwn&body=x&domain=tools"))
+	req.Host = "localhost"
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("Test: %v", err)
+	}
+	if resp.StatusCode != http.StatusUnsupportedMediaType {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 415 body=%s", resp.StatusCode, body)
+	}
+}
+
 func TestMemoryCRUDHappyPath(t *testing.T) {
 	_, app := newTestApp(t)
 
@@ -173,7 +204,7 @@ func TestMemoryCRUDHappyPath(t *testing.T) {
 		t.Fatalf("updated importance = %d, want 4", updated.Importance)
 	}
 
-	deleteResp := doReq(t, app, http.MethodDelete, "/api/memories/"+created.ID, "")
+	deleteResp := doReq(t, app, http.MethodDelete, "/api/memories/"+created.ID, "{}")
 	if deleteResp.StatusCode != http.StatusNoContent {
 		t.Fatalf("delete status = %d, want 204", deleteResp.StatusCode)
 	}

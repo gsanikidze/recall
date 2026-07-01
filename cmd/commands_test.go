@@ -2,12 +2,15 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"recall/internal/index"
+	"recall/internal/memory"
+	"recall/internal/recall"
 )
 
 func TestParseEmbedArgs(t *testing.T) {
@@ -65,6 +68,75 @@ func TestEmbedJSONFlowWithFakeProvider(t *testing.T) {
 	})
 	if !strings.Contains(out, `"embedded": 0`) || !strings.Contains(out, `"skipped": 2`) {
 		t.Fatalf("second embed json output = %s", out)
+	}
+}
+
+func TestDoctorFixReindexesVaultDrift(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "brain")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := Init([]string{"--path", project, "--force"}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	today := memory.Today()
+	unindexed := memory.Memory{
+		ID:         memory.NewID(),
+		Title:      "Unindexed",
+		Domain:     "tools",
+		Created:    today,
+		Updated:    today,
+		Importance: 3,
+		Lifecycle:  memory.Evergreen,
+		Body:       "only in vault",
+	}
+	data, err := unindexed.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	abs := filepath.Join(project, "vault", "tools", "unindexed.md")
+	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(abs, data, 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Doctor([]string{"--deep", "--fix", "--json"}); err != nil {
+			t.Fatalf("Doctor --fix: %v", err)
+		}
+	})
+	if !strings.Contains(out, `"ok": true`) || !strings.Contains(out, `"reindex"`) || !strings.Contains(out, `"indexed": 1`) {
+		t.Fatalf("doctor fix output = %s", out)
+	}
+
+	e, err := recall.Open(project)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer e.Close()
+	if _, _, err := e.Get(context.Background(), unindexed.ID); err != nil {
+		t.Fatalf("fixed index missing memory %s: %v", unindexed.ID, err)
+	}
+}
+
+func TestDoctorFixEmbeddingsWithFakeProvider(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "brain")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := Init([]string{"--path", project, "--force"}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if err := Add([]string{"--title", "Needs embedding", "--domain", "tools", "--body", "semantic body"}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Doctor([]string{"--embeddings", "--provider", "fake", "--model", "fake-32", "--fix", "--fix-embeddings", "--json"}); err != nil {
+			t.Fatalf("Doctor --fix-embeddings: %v", err)
+		}
+	})
+	if !strings.Contains(out, `"ok": true`) || !strings.Contains(out, `"missing": 0`) || !strings.Contains(out, `"embedded": 1`) || !strings.Contains(out, `"embed"`) {
+		t.Fatalf("doctor fix embeddings output = %s", out)
 	}
 }
 

@@ -15,8 +15,10 @@ func Doctor(args []string) error {
 	jsonOut := fs.Bool("json", false, "print JSON")
 	deep := fs.Bool("deep", false, "audit vault/index drift and invalid memory files")
 	embeddings := fs.Bool("embeddings", false, "report embedding coverage for indexed memories")
-	provider := fs.String("provider", "ollama", "embedding provider for --embeddings")
-	model := fs.String("model", embedding.DefaultOllamaModel, "embedding model for --embeddings")
+	fix := fs.Bool("fix", false, "run deterministic safe repairs before reporting")
+	fixEmbeddings := fs.Bool("fix-embeddings", false, "with --fix, generate missing embeddings too")
+	provider := fs.String("provider", "ollama", "embedding provider for --embeddings or --fix-embeddings")
+	model := fs.String("model", embedding.DefaultOllamaModel, "embedding model for --embeddings or --fix-embeddings")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -46,6 +48,7 @@ func Doctor(args []string) error {
 
 	report := doctor.Run(context.Background(), e, doctor.Options{
 		Deep: *deep, Embeddings: *embeddings, Provider: *provider, Model: *model,
+		Fix: *fix, FixEmbeddings: *fixEmbeddings,
 	}, projectPath, vaultPath, dbPath, cfgPath)
 
 	if *jsonOut {
@@ -81,6 +84,19 @@ func printDoctor(r doctor.Report) error {
 		for _, dup := range r.DuplicateVaultIDs {
 			fmt.Printf("duplicate vault id: %s %s\n", dup.ID, strings.Join(dup.Paths, ", "))
 		}
+	}
+	for _, fix := range r.Fixes {
+		fmt.Printf("fix: %s ok=%v", fix.Action, fix.OK)
+		if fix.Indexed > 0 || fix.Deleted > 0 {
+			fmt.Printf(" indexed=%d deleted=%d", fix.Indexed, fix.Deleted)
+		}
+		if fix.Embedded > 0 || fix.Skipped > 0 || fix.Failed > 0 {
+			fmt.Printf(" embedded=%d skipped=%d failed=%d", fix.Embedded, fix.Skipped, fix.Failed)
+		}
+		if fix.Message != "" {
+			fmt.Printf(" message=%s", fix.Message)
+		}
+		fmt.Println()
 	}
 	if r.Embeddings != nil {
 		fmt.Printf("embeddings: %s/%s", r.Embeddings.Provider, r.Embeddings.Model)

@@ -17,10 +17,24 @@ import (
 
 // Options controls which audits Run performs.
 type Options struct {
-	Deep       bool   // audit vault/index drift and invalid memory files
-	Embeddings bool   // report embedding coverage for indexed memories
-	Provider   string // embedding provider for Embeddings
-	Model      string // embedding model for Embeddings
+	Deep          bool   // audit vault/index drift and invalid memory files
+	Embeddings    bool   // report embedding coverage for indexed memories
+	Provider      string // embedding provider for Embeddings
+	Model         string // embedding model for Embeddings
+	Fix           bool   // run deterministic safe repairs before the final audit
+	FixEmbeddings bool   // when Fix is true, generate missing embeddings too
+}
+
+// FixResult records one repair action run by doctor --fix.
+type FixResult struct {
+	Action  string `json:"action"`
+	OK      bool   `json:"ok"`
+	Message string `json:"message,omitempty"`
+	Indexed int    `json:"indexed,omitempty"`
+	Deleted int    `json:"deleted,omitempty"`
+	Embedded int   `json:"embedded,omitempty"`
+	Skipped  int   `json:"skipped,omitempty"`
+	Failed   int   `json:"failed,omitempty"`
 }
 
 // Report is the audit result. JSON tags are stable: CLI tests assert on them.
@@ -40,6 +54,7 @@ type Report struct {
 	UnindexedVaultFiles []UnindexedVaultFile `json:"unindexed_vault_files,omitempty"`
 	DuplicateVaultIDs   []DuplicateVaultID   `json:"duplicate_vault_ids,omitempty"`
 	Embeddings          *EmbeddingReady      `json:"embeddings,omitempty"`
+	Fixes               []FixResult          `json:"fixes,omitempty"`
 	Suggestions         []Suggestion         `json:"suggestions,omitempty"`
 	Errors              []string             `json:"errors"`
 }
@@ -138,14 +153,67 @@ func Run(ctx context.Context, e *recall.Engine, opts Options, projectPath, vault
 		report.Memories = count
 	}
 
+	if opts.Fix {
+		report.Fixes = repair(ctx, e, opts)
+	}
 	if opts.Deep {
 		auditDeep(ctx, e, &report)
 	}
-	if opts.Embeddings {
+	if opts.Embeddings || opts.FixEmbeddings {
 		auditEmbeddings(ctx, e, &report, opts.Provider, opts.Model)
 	}
 	report.Suggestions = buildSuggestions(&report)
 	return report
+}
+
+func repair(ctx context.Context, e *recall.Engine, opts Options) []FixResult {
+	var fixes []FixResult
+	stats, err := e.Reindex(ctx)
+	fix := FixResult{Action: "reindex"}
+	if err != nil {
+		fix.OK = false
+		fix.Message = err.Error()
+	} else {
+		fix.OK = true
+		fix.Indexed = stats.Indexed
+		fix.Deleted = stats.Deleted
+	}
+	fixes = append(fixes, fix)
+
+	if opts.FixEmbeddings {
+		provider, model := normalizeEmbeddingProviderModel(opts.Provider, opts.Model)
+		p, err := embedding.NewProvider(provider, model, "")
+		embedFix := FixResult{Action: "embed"}
+		if err != nil {
+			embedFix.OK = false
+			embedFix.Message = err.Error()
+		} else {
+			embedStats, err := e.EmbedAll(ctx, p, false)
+			if err != nil {
+				embedFix.OK = false
+				embedFix.Message = err.Error()
+			} else {
+				embedFix.OK = true
+				embedFix.Embedded = embedStats.Embedded
+				embedFix.Skipped = embedStats.Skipped
+				embedFix.Failed = embedStats.Failed
+			}
+		}
+		fixes = append(fixes, embedFix)
+	}
+	return fixes
+}
+
+func normalizeEmbeddingProviderModel(provider, model string) (string, string) {
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		provider = "ollama"
+	}
+	model = strings.TrimSpace(model)
+	if model == "" {
+		model = embedding.DefaultOllamaModel
+	}
+	return provider, model
 }
 
 func auditDeep(ctx context.Context, e *recall.Engine, report *Report) {
@@ -217,14 +285,7 @@ func auditDeep(ctx context.Context, e *recall.Engine, report *Report) {
 }
 
 func auditEmbeddings(ctx context.Context, e *recall.Engine, report *Report, provider, model string) {
-	provider = strings.TrimSpace(provider)
-	if provider == "" {
-		provider = "ollama"
-	}
-	model = strings.TrimSpace(model)
-	if model == "" {
-		model = embedding.DefaultOllamaModel
-	}
+	provider, model = normalizeEmbeddingProviderModel(provider, model)
 
 	ready := &EmbeddingReady{Provider: provider, Model: model}
 
